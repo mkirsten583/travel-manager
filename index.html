@@ -1,0 +1,1506 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Travel manager</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232b6cb0'/%3E%3Cpath d='M7 21l18-9-4 13-5-5-3 3-1-6z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{
+  --bg:#edf0f3; --surface:#fff; --wk:#f5f7f9; --ink:#15212b; --muted:#5a6773; --line:#d3dae1; --hover:#e8edf1;
+  --danger:#b3261e; --ok:#2e7d4f; --warn:#b26a00;
+  --c-stay:#8a5a2b; --c-food:#c0562a; --c-act:#8e44ad; --c-trans:#2b6cb0;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#11161b; --surface:#1a2129; --wk:#171d24; --ink:#e7ecf0; --muted:#94a1ad; --line:#2d3740; --hover:#242e37;
+    --danger:#ff8a80; --ok:#7ad39c; --warn:#f0b85a;
+    --c-stay:#d9a56b; --c-food:#f09a70; --c-act:#cf9de6; --c-trans:#7db4ff;}
+}
+.k-stay{--k:var(--c-stay)} .k-food{--k:var(--c-food)} .k-activity{--k:var(--c-act)} .k-transport{--k:var(--c-trans)}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 "Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:-3px}
+.wrap{max-width:1500px;margin:0 auto;padding:14px 16px 40px}
+
+.bar{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center;margin-bottom:12px}
+.bar h1{font-size:20px;margin:0 6px 0 0;font-weight:650;letter-spacing:-.01em}
+.bar select{font:inherit;font-weight:600;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 8px;max-width:240px}
+.sp{flex:1}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 11px;cursor:pointer;font-size:13.5px}
+.btn:hover{background:var(--hover)}
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.sm{padding:3px 8px;font-size:12.5px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-size:13.5px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:12.5px;cursor:pointer}
+.pill .sd{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.pill.ok .sd{background:var(--ok)} .pill.bad .sd{background:var(--danger)} .pill.warn .sd{background:var(--warn)}
+.menuwrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:5px;z-index:20;min-width:190px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;background:none;padding:7px 9px;border-radius:7px;cursor:pointer;color:var(--k,var(--ink))}
+.menu button:hover{background:var(--hover)}
+
+.layout{display:grid;grid-template-columns:230px 1fr;gap:14px;align-items:start}
+.rail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px;position:sticky;top:8px;max-height:calc(100vh - 24px);overflow:auto}
+.rd{display:block;width:100%;text-align:left;border:1px solid transparent;background:none;border-radius:8px;padding:6px 8px;cursor:pointer}
+.rd:hover{background:var(--hover)}
+.rd.sel{background:var(--hover);border-color:var(--ink)}
+.rd .n{font-size:11.5px;color:var(--muted)}
+.rd .d{font-weight:600}
+.rd .tt{font-size:12.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rd .ic{display:flex;gap:5px;margin-top:2px}
+.rd .ic span{display:inline-flex;align-items:center;gap:2px;font-size:11px;color:var(--k)}
+.rd.empty .d{color:var(--muted);font-weight:500}
+.main{min-width:0}
+
+.dayhead{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.dayhead .row1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dayhead h2{margin:0;font-size:20px;font-weight:650}
+.dayhead .sub{color:var(--muted);font-size:13px}
+.dtitle{font:inherit;font-size:15px;font-weight:600;width:100%;margin-top:8px;border:1px solid transparent;border-radius:7px;padding:4px 6px;background:transparent;color:var(--ink)}
+.dtitle:hover,.dtitle:focus{border-color:var(--line);background:var(--bg)}
+.daynotes{width:100%;margin-top:6px;font:inherit;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-height:38px;resize:vertical}
+
+.sec{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:12px;border-left:4px solid var(--k)}
+.sec>header{display:flex;align-items:center;gap:8px;padding:9px 12px;color:var(--k);font-weight:650}
+.sec>header .cnt{font-weight:500;color:var(--muted);font-size:12.5px}
+.sec .list{padding:0 10px 10px;display:grid;gap:8px}
+.sec .none{padding:0 14px 12px;color:var(--muted);font-size:13px}
+.card{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);background:var(--wk);border-radius:9px;padding:9px 11px;cursor:pointer}
+.card:hover{background:var(--hover)}
+.card .ico{color:var(--k);padding-top:1px}
+.card .cb{flex:1;min-width:0}
+.card .t1{font-weight:600}
+.card .tm{font-variant-numeric:tabular-nums;color:var(--k);margin-right:6px;font-weight:650}
+.card .t2{color:var(--muted);font-size:12.5px;margin-top:1px;overflow-wrap:anywhere}
+.card .nt{font-size:12.5px;margin-top:4px;color:var(--ink);white-space:pre-wrap;overflow-wrap:anywhere;max-height:3.9em;overflow:hidden}
+.badges{display:flex;gap:7px;color:var(--muted);font-size:12px;align-items:center;flex:none}
+.badges span{display:inline-flex;align-items:center;gap:2px}
+.tag{display:inline-block;font-size:11px;font-weight:650;padding:0 7px;border-radius:999px;background:var(--k);color:var(--surface);margin-left:6px;vertical-align:1px}
+.mini{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:0 6px;color:var(--muted);margin-left:5px}
+
+.cal{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cal .hd,.cal .wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.cal .hd div{padding:6px 8px;font-size:12px;color:var(--muted);background:var(--wk);border-bottom:1px solid var(--line)}
+.cd{min-height:118px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 5px;cursor:pointer;min-width:0}
+.cd:nth-child(7n){border-right:0}
+.cd.out{background:var(--wk);opacity:.55;cursor:default}
+.cd:not(.out):hover{background:var(--hover)}
+.cd .dn{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.cd .dn b{color:var(--ink)}
+.chip{display:flex;gap:3px;align-items:center;font-size:11.5px;margin-top:2px;padding:1px 4px;border-radius:5px;background:color-mix(in srgb,var(--k) 16%,transparent);color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.chip svg{color:var(--k);width:12px;height:12px}
+.chip span{overflow:hidden;text-overflow:ellipsis}
+.more{font-size:11px;color:var(--muted);margin-top:2px}
+
+.agday{background:var(--surface);border:1px solid var(--line);border-radius:12px;margin-bottom:10px;padding:10px 14px}
+.agday h3{margin:0 0 6px;font-size:15px}
+.agi{display:flex;gap:8px;align-items:baseline;padding:3px 0;cursor:pointer}
+.agi:hover{background:var(--hover)}
+.agi .ico{color:var(--k)}
+.agi .tm{width:48px;font-variant-numeric:tabular-nums;color:var(--muted);flex:none}
+
+#bigmap,.mapbox{height:520px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--wk)}
+.mapbox.sm{height:260px;border-radius:9px}
+.mapnote{font-size:12px;color:var(--muted);margin-top:4px}
+.leaflet-container{font:inherit}
+.pin{width:22px;height:22px;border-radius:50%;background:var(--k,#2b6cb0);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);padding:0;width:min(760px,95vw);max-height:92vh}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog form,.dbody{display:flex;flex-direction:column;max-height:92vh}
+.dh{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);color:var(--k,var(--ink));font-weight:650;font-size:16px}
+.dh .x{margin-left:auto;border:0;background:none;cursor:pointer;font-size:22px;line-height:1;color:var(--muted)}
+.db{padding:14px 16px;overflow:auto;display:grid;gap:12px}
+.df{display:flex;gap:8px;justify-content:flex-end;padding:11px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
+.df .l{margin-right:auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
+.f input,.f select,.f textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
+.f textarea{min-height:90px;resize:vertical}
+.blk{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:8px}
+.blk h4{margin:0;font-size:13px;display:flex;align-items:center;gap:6px}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:10px;text-align:center;font-size:13px;color:var(--muted);background:var(--bg);cursor:text;outline-offset:2px}
+.drop:focus,.drop.over{border-color:var(--ink);color:var(--ink)}
+.atts{display:flex;flex-wrap:wrap;gap:8px}
+.att{position:relative;border:1px solid var(--line);border-radius:8px;background:var(--wk);overflow:hidden;max-width:170px}
+.att img{display:block;max-width:170px;max-height:120px;cursor:zoom-in;object-fit:cover}
+.att .fn{padding:6px 8px;font-size:12px;overflow-wrap:anywhere;cursor:pointer}
+.att .fn small{display:block;color:var(--muted)}
+.att .rm{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;line-height:1;padding:0;font-size:13px}
+.hint{font-size:12px;color:var(--muted)}
+.linkbtn{background:none;border:0;padding:0;color:var(--ink);text-decoration:underline;cursor:pointer;font-size:12.5px}
+.sum{display:flex;flex-wrap:wrap;gap:6px}
+.sum span{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12.5px}
+.sum .n{background:#2e7d4f22}.sum .u{background:#b26a0022}.sum .m{background:#2b6cb022}.sum .x{background:#b3261e22}
+.pv{max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px}
+.pv h5{margin:8px 0 2px;font-size:13px}
+.pv .r{display:flex;gap:6px;align-items:baseline;padding:1px 0}
+.pv .st{font-size:11px;font-weight:650;width:56px;flex:none}
+.st.new{color:var(--ok)}.st.upd{color:var(--warn)}.st.mv{color:var(--c-trans)}.st.same{color:var(--muted)}
+pre.fmt{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;white-space:pre-wrap;margin:0}
+#lb{width:min(96vw,1100px);background:#000;border:0}
+#lb img{max-width:100%;max-height:88vh;display:block;margin:0 auto}
+#lb .lbx{position:absolute;top:6px;right:10px;color:#fff;background:none;border:0;font-size:28px;cursor:pointer}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:9px 14px;border-radius:9px;font-size:13.5px;z-index:99;max-width:90vw;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.on{opacity:1}
+.foot{margin-top:18px;font-size:11.5px;color:var(--muted);text-align:center}
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:30px;text-align:center;color:var(--muted)}
+@media (max-width:820px){
+  .layout{grid-template-columns:1fr}
+  .rail{position:static;max-height:none;display:flex;gap:6px;overflow-x:auto;padding:6px}
+  .rd{min-width:132px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .cd{min-height:84px}.chip span{display:none}
+}
+@media print{
+  body{background:#fff}
+  .bar,.rail,.df,.foot,.toast,.dayhead textarea,.sec header button,.nop{display:none!important}
+  .layout{display:block}
+  .sec,.agday,.dayhead{break-inside:avoid;border-color:#bbb}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+  <div class="bar">
+    <h1>Travel manager</h1>
+    <select id="tripSel" aria-label="Trip"></select>
+    <div class="seg" id="viewSeg">
+      <button data-view="day">Day</button><button data-view="cal">Calendar</button><button data-view="agenda">Agenda</button><button data-view="map">Map</button>
+    </div>
+    <span class="sp"></span>
+    <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
+    <div class="menuwrap"><button class="btn primary" data-act="addmenu">+ Add</button><div class="menu" id="addMenu" hidden></div></div>
+    <button class="btn" data-act="print" title="Print or save as PDF">Print</button>
+    <button class="btn" data-act="trip">Trip</button>
+    <button class="pill" id="pill" data-act="data" title="Data &amp; sync"><i class="sd"></i><span class="tx">Local only</span></button>
+  </div>
+  <div class="layout">
+    <nav class="rail" id="rail" aria-label="Days"></nav>
+    <main class="main" id="main"></main>
+  </div>
+  <div class="foot" id="foot"></div>
+</div>
+<dialog id="dlg"></dialog>
+<dialog id="dlg2"></dialog>
+<dialog id="lb"><button class="lbx" id="lbx" aria-label="Close">&times;</button><img id="lbimg" alt=""></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+'use strict';
+
+/* ============ EDIT THESE LINES BEFORE PUBLISHING ============ */
+const GRAPH_CLIENT_ID_DEFAULT = 'PASTE-YOUR-CLIENT-ID-HERE';   // Azure app registration for THIS page (or paste it in Data & sync)
+const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel';        // OneDrive folder (keep the marc.kirsten/ prefix)
+const DATA_FILE = DATA_FOLDER + '/travel-data.json';
+const VERSION = '2026-10-27 · travel manager v1';
+/* ============================================================ */
+
+const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
+const GRAPH_SCOPES=['User.Read','Files.ReadWrite'];
+const TYPES=[
+  {id:'stay',label:'Accommodation',add:'Accommodation',icon:'bed'},
+  {id:'food',label:'Meals & food',add:'Meal / food',icon:'food'},
+  {id:'activity',label:'Activities',add:'Activity',icon:'star'},
+  {id:'transport',label:'Transport',add:'Transport',icon:'train'}
+];
+const TYPE_BY_ID=Object.fromEntries(TYPES.map(t=>[t.id,t]));
+const MODES=[['train','Train / metro'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
+const MEALS=[['','—'],['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack / drink']];
+const IMPORT_FIELDS=['title','date','endDate','time','endTime','slot','place','from','to','mode','meal'];
+const ICONS={
+  bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
+  food:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+  star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  train:'<rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16M12 3v8M8 19l-2 3M18 22l-2-3M8 15h.01M16 15h.01"/>',
+  flight:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+  bus:'<path d="M8 6v6M15 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
+  car:'<path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/>',
+  ferry:'<path d="M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1 .6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1M19.4 20A11.6 11.6 0 0 0 21 14l-9-4-9 4c0 2.9.9 5.3 2.8 7.8M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6M12 10v4M12 2v3"/>',
+  walk:'<circle cx="13" cy="4" r="1.6"/><path d="M7 21l3-7 3 3v5M10 14l-1-4 4-2 3 3h3"/>',
+  other:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+  pin:'<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+  clip:'<path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  note:'<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  map:'<polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>'
+};
+const ico=(k,cls)=>'<svg class="i '+(cls||'')+'" viewBox="0 0 24 24" aria-hidden="true">'+(ICONS[k]||ICONS.other)+'</svg>';
+const iconFor=it=>it.type==='transport'?(ICONS[it.mode]?it.mode:'other'):(TYPE_BY_ID[it.type]||TYPES[2]).icon;
+
+/* ---------- helpers ---------- */
+const $=(s,r)=>(r||document).querySelector(s), $$=(s,r)=>Array.from((r||document).querySelectorAll(s));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const pad=n=>String(n).padStart(2,'0');
+const isoOf=(y,m,d)=>{const dt=new Date(y,m,d,12);return dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());};
+const parseISO=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?new Date(+m[1],+m[2]-1,+m[3],12):null;};
+const toISO=d=>isoOf(d.getFullYear(),d.getMonth(),d.getDate());
+const addDays=(s,n)=>{const d=parseISO(s);d.setDate(d.getDate()+n);return toISO(d);};
+const diffDays=(a,b)=>Math.round((parseISO(b)-parseISO(a))/864e5);
+const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'], WDL=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const fmtShort=s=>{const d=parseISO(s);return d?WD[d.getDay()]+' '+d.getDate()+' '+MN[d.getMonth()]:'';};
+const fmtLong=s=>{const d=parseISO(s);return d?WDL[d.getDay()]+' '+d.getDate()+' '+MN[d.getMonth()]+' '+d.getFullYear():'';};
+const safeUrl=u=>{u=String(u||'').trim();if(!u)return '';if(!/^https?:\/\//i.test(u))u='https://'+u;try{const x=new URL(u);return /^https?:$/.test(x.protocol)?x.href:'';}catch(e){return '';}};
+const fmtSize=n=>n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB';
+const norm=s=>String(s||'').toLowerCase().replace(/[-'\u2019]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9぀-ヿ一-鿿 ]+/g,' ').replace(/\s+/g,' ').trim();
+let toastT=null;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),3800);}
+
+/* ---------- state ---------- */
+let data={v:1,trips:[],items:[],geo:{}};
+let selTrip=null, selDate=null, view='day';
+let lastText=null, dirty=false, writing=false, rev=0, saveTimer=null;
+let msalApp=null, msalAccount=null;
+const framed=(()=>{try{return window.self!==window.top;}catch(e){return true;}})();
+const clientId=()=>{try{return localStorage.getItem(LS_CID)||GRAPH_CLIENT_ID_DEFAULT;}catch(e){return GRAPH_CLIENT_ID_DEFAULT;}};
+const msalConfigured=()=>{const c=clientId();return !!c&&!/PASTE/i.test(c);};
+
+function normalise(o){
+  o=(o&&typeof o==='object')?o:{};
+  const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
+  for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';}
+  for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';}
+  return d;
+}
+const trip=()=>data.trips.find(t=>t.id===selTrip)||null;
+const tripItems=()=>data.items.filter(i=>i.trip===selTrip);
+const itemById=id=>data.items.find(i=>i.id===id);
+function tripRange(t){
+  let s=t.start,e=t.end;
+  for(const i of data.items){if(i.trip!==t.id)continue;
+    for(const d of [i.date,i.endDate]){if(!d)continue;if(!s||d<s)s=d;if(!e||d>e)e=d;}}
+  return {start:s,end:e||s};
+}
+function tripDays(t){
+  const r=tripRange(t); if(!r.start) return [];
+  const out=[];let d=r.start,n=0;
+  while(d<=r.end&&n<400){out.push(d);d=addDays(d,1);n++;}
+  return out;
+}
+function sortKey(it){return (it.time||SLOT_TIME[it.slot]||'99:99')+'|'+(it.title||'');}
+const SLOT_TIME={Morning:'09:00',Afternoon:'14:00',Evening:'18:00',Night:'21:00'};
+function itemsOnDay(date,type){
+  return tripItems().filter(i=>i.type===type&&(i.type==='stay'?(i.date&&i.date<=date&&date<=(i.endDate||i.date)):i.date===date))
+    .sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
+}
+
+/* ---------- persistence ---------- */
+function cacheLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify(data));}catch(e){}}
+function setDirtyFlag(v){dirty=v;try{localStorage.setItem(LS_DIRTY,v?'1':'0');}catch(e){}}
+function changed(){
+  rev++;setDirtyFlag(true);cacheLocal();
+  if(msalAccount){setStatus('saving');clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToOneDrive(),700);}
+}
+function setStatus(s,msg){
+  const p=$('#pill');if(!p)return;const tx=$('.tx',p);
+  p.className='pill '+({saved:'ok',saving:'warn',error:'bad',local:''}[s]||'');
+  tx.textContent={saved:'Saved to OneDrive',saving:'Saving…',error:'Save problem',local:msalConfigured()?'Local only — sign in':'Local only'}[s]||s;
+  p.title=msg||'Data & sync';
+}
+
+/* ---------- Microsoft Graph ---------- */
+const graphUrl=(path,suffix)=>'https://graph.microsoft.com/v1.0/me/drive/root:/'+path.split('/').map(encodeURIComponent).join('/')+(suffix==null?':/content':suffix);
+async function getToken(interactive){
+  if(!msalApp)return null;
+  const acct=msalAccount||msalApp.getAllAccounts()[0];if(!acct)return null;
+  try{const r=await msalApp.acquireTokenSilent({scopes:GRAPH_SCOPES,account:acct});msalAccount=r.account;return r.accessToken;}
+  catch(e){if(!interactive)return null;const r=await msalApp.acquireTokenPopup({scopes:GRAPH_SCOPES});msalAccount=r.account;return r.accessToken;}
+}
+async function gGetText(path){
+  const tk=await getToken(true);if(!tk)throw new Error('Not signed in');
+  const r=await fetch(graphUrl(path),{headers:{Authorization:'Bearer '+tk}});
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error('OneDrive read failed (HTTP '+r.status+')');
+  return await r.text();
+}
+async function gGetBlob(path){
+  const tk=await getToken(false);if(!tk)return null;
+  const r=await fetch(graphUrl(path),{headers:{Authorization:'Bearer '+tk}});
+  if(!r.ok)return null;
+  return await r.blob();
+}
+async function gPut(path,body,ctype){
+  const tk=await getToken(true);if(!tk)throw new Error('Not signed in');
+  const size=body.size!=null?body.size:body.length;
+  if(size<=4*1024*1024){
+    const r=await fetch(graphUrl(path),{method:'PUT',headers:{Authorization:'Bearer '+tk,'Content-Type':ctype||'application/octet-stream'},body});
+    if(!r.ok)throw new Error('OneDrive save failed (HTTP '+r.status+')');return;
+  }
+  const sr=await fetch(graphUrl(path,':/createUploadSession'),{method:'POST',headers:{Authorization:'Bearer '+tk,'Content-Type':'application/json'},body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'replace'}})});
+  if(!sr.ok)throw new Error('Could not start a large upload (HTTP '+sr.status+')');
+  const up=(await sr.json()).uploadUrl,chunk=3276800;
+  const buf=body instanceof Blob?new Uint8Array(await body.arrayBuffer()):new TextEncoder().encode(body);
+  for(let s=0;s<buf.length;s+=chunk){
+    const e=Math.min(s+chunk,buf.length),part=buf.slice(s,e);
+    const r=await fetch(up,{method:'PUT',headers:{'Content-Length':String(part.length),'Content-Range':'bytes '+s+'-'+(e-1)+'/'+buf.length},body:part});
+    if(!r.ok&&r.status!==202)throw new Error('Upload interrupted (HTTP '+r.status+')');
+  }
+}
+async function gDelete(path){
+  try{const tk=await getToken(false);if(!tk)return;await fetch(graphUrl(path,''),{method:'DELETE',headers:{Authorization:'Bearer '+tk}});}catch(e){}
+}
+function askChoice(title,text,choices){
+  return new Promise(res=>{
+    const d=$('#dlg2');
+    d.innerHTML='<div class="dbody"><div class="dh">'+esc(title)+'</div><div class="db"><p style="margin:0">'+esc(text)+'</p></div><div class="df">'+
+      choices.map((c,i)=>'<button class="btn'+(i===0?' primary':'')+'" data-c="'+i+'">'+esc(c)+'</button>').join('')+'</div></div>';
+    d.onclick=e=>{const b=e.target.closest('[data-c]');if(b){d.close();res(+b.dataset.c);}};
+    d.oncancel=()=>res(-1);
+    d.showModal();
+  });
+}
+async function saveToOneDrive(force){
+  if(!msalAccount||writing)return;
+  writing=true;const startRev=rev;
+  try{
+    if(!force){
+      const cur=await gGetText(DATA_FILE);
+      if(cur!==null&&lastText!==null&&cur!==lastText&&cur.trim()){
+        const c=await askChoice('The travel file changed elsewhere','Another device changed your travel data since this page last read it. Which version do you want to keep?',['Load the other version','Overwrite it with what is on this page']);
+        if(c===0){data=normalise(JSON.parse(cur));lastText=cur;setDirtyFlag(false);cacheLocal();setStatus('saved');ensureSel();renderAll();return;}
+      }
+    }
+    setStatus('saving');
+    const text=JSON.stringify(data,null,1);
+    await gPut(DATA_FILE,text,'application/json');
+    lastText=text;
+    if(rev===startRev){setDirtyFlag(false);setStatus('saved');}
+    else{clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToOneDrive(),300);}
+    sweepUploads();
+  }catch(e){console.error(e);setStatus('error',e.message||String(e));}
+  finally{writing=false;}
+}
+async function syncFromOneDrive(){
+  if(!msalAccount)return;
+  try{
+    const txt=await gGetText(DATA_FILE);
+    if(txt===null){await saveToOneDrive(true);return;}
+    if(txt===lastText){dirty?(clearTimeout(saveTimer),saveTimer=setTimeout(()=>saveToOneDrive(),300)):setStatus('saved');sweepUploads();return;}
+    let obj;try{obj=JSON.parse(txt);}catch(e){setStatus('error','The OneDrive file is not valid JSON.');return;}
+    if(dirty){
+      const c=await askChoice('Changes here were not saved yet','This page has changes that never reached OneDrive. Keep them (and overwrite), or load what is on OneDrive now?',['Keep my changes and overwrite','Load the OneDrive version']);
+      if(c===0){await saveToOneDrive(true);return;}
+    }
+    data=normalise(obj);lastText=txt;setDirtyFlag(false);cacheLocal();setStatus('saved');ensureSel();renderAll();sweepUploads();
+  }catch(e){console.error(e);setStatus('error',e.message||String(e));}
+}
+async function signIn(){
+  if(!msalConfigured()){toast('Paste your Azure client ID in Data & sync first.');return;}
+  try{
+    const r=await msalApp.loginPopup({scopes:GRAPH_SCOPES});msalAccount=r.account;
+    await syncFromOneDrive();openData();
+  }catch(e){toast('Sign-in was not completed: '+(e.message||e));}
+}
+function signOut(){
+  const a=msalAccount;msalAccount=null;setStatus('local');
+  if(a&&msalApp)msalApp.logoutPopup({account:a}).catch(()=>{});
+  openData();
+}
+
+/* ---------- attachments (IndexedDB on this device + OneDrive when signed in) ---------- */
+let _db=null;
+function idb(){
+  if(_db)return _db;
+  _db=new Promise((res,rej)=>{
+    if(!window.indexedDB){rej(new Error('no idb'));return;}
+    const r=indexedDB.open('travel-mgr-files',1);
+    r.onupgradeneeded=()=>r.result.createObjectStore('f');
+    r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);
+  });
+  return _db;
+}
+async function idbPut(id,blob){try{const db=await idb();await new Promise((res,rej)=>{const tx=db.transaction('f','readwrite');tx.objectStore('f').put(blob,id);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});return true;}catch(e){return false;}}
+async function idbGet(id){try{const db=await idb();return await new Promise((res,rej)=>{const q=db.transaction('f').objectStore('f').get(id);q.onsuccess=()=>res(q.result||null);q.onerror=()=>rej(q.error);});}catch(e){return null;}}
+async function idbDel(id){try{const db=await idb();await new Promise(res=>{const tx=db.transaction('f','readwrite');tx.objectStore('f').delete(id);tx.oncomplete=res;tx.onerror=res;});}catch(e){}}
+const safeName=n=>String(n||'file').replace(/[\\/:*?"<>|#%]+/g,'_').slice(0,80);
+const attPath=a=>DATA_FOLDER+'/Attachments/'+a.id+'-'+safeName(a.name);
+function newAtt(file,map){
+  const ext=(file.type&&file.type.split('/')[1])||'bin';
+  let name=file.name;
+  if(!name||/^image\.(png|jpe?g)$/i.test(name)){const d=new Date();name=(map?'map':'screenshot')+'-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())+'.'+ext.replace('jpeg','jpg').replace('svg+xml','svg');}
+  return {id:uid(),name,type:file.type||'application/octet-stream',size:file.size,map:!!map,up:false};
+}
+const blobCache=new Map();
+async function attBlob(a){
+  if(blobCache.has(a.id))return blobCache.get(a.id);
+  let b=await idbGet(a.id);
+  if(!b&&msalAccount&&a.up){b=await gGetBlob(attPath(a));if(b)idbPut(a.id,b);}
+  if(b)blobCache.set(a.id,b);
+  return b;
+}
+async function uploadAtt(a){
+  if(!msalAccount||a.up)return false;
+  const b=await idbGet(a.id);if(!b)return false;
+  try{await gPut(attPath(a),b,a.type);a.up=true;return true;}catch(e){console.error(e);return false;}
+}
+let sweeping=false;
+async function sweepUploads(){
+  if(sweeping||!msalAccount)return;sweeping=true;
+  try{
+    let n=0;
+    for(const it of data.items)for(const a of it.atts){if(!a.up&&await uploadAtt(a))n++;}
+    if(n){cacheLocal();rev++;clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToOneDrive(),300);}
+  }finally{sweeping=false;}
+}
+async function removeAttFiles(a){blobCache.delete(a.id);await idbDel(a.id);if(a.up)gDelete(attPath(a));}
+
+/* ============ ITINERARY PARSER ============ */
+const MON_RE='(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)';
+const MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+const monIdx=s=>MONTHS[s.slice(0,3).toLowerCase()];
+function inferYear(d,mon,base){
+  const b=base?parseISO(base):new Date();let y=b.getFullYear();
+  if(new Date(y,mon,d,12)<new Date(b.getTime()-60*864e5))y++;
+  return y;
+}
+function findDate(s,base){
+  let m=s.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+  if(m)return {iso:isoOf(+m[1],+m[2]-1,+m[3]),text:m[0]};
+  m=s.match(new RegExp('\\b(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?'+MON_RE+'\\b\\.?(?:,?\\s+(\\d{4}))?','i'));
+  if(m){const mon=monIdx(m[2]),d=+m[1];return {iso:isoOf(m[3]?+m[3]:inferYear(d,mon,base),mon,d),text:m[0]};}
+  m=s.match(new RegExp('\\b'+MON_RE+'\\b\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b(?:,?\\s+(\\d{4}))?','i'));
+  if(m){const mon=monIdx(m[1]),d=+m[2];return {iso:isoOf(m[3]?+m[3]:inferYear(d,mon,base),mon,d),text:m[0]};}
+  m=s.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if(m&&+m[1]<=31&&+m[2]<=12){const d=+m[1],mon=+m[2]-1;let y=m[3]?+m[3]:inferYear(d,mon,base);if(y<100)y+=2000;return {iso:isoOf(y,mon,d),text:m[0]};}
+  return null;
+}
+const TT='(\\d{1,2}[:.]\\d{2}\\s*(?:a\\.?m\\.?|p\\.?m\\.?)?|\\d{1,2}\\s*(?:a\\.?m\\.?|p\\.?m\\.?))';
+function toHHMM(tok){
+  const t=String(tok).toLowerCase().replace(/a\.?m\.?/,'am').replace(/p\.?m\.?/,'pm').replace(/\s+/g,'');
+  const m=/^(\d{1,2})(?:[:.](\d{2}))?(am|pm)?$/.exec(t);if(!m)return '';
+  let h=+m[1];const mi=+(m[2]||0);
+  if(m[3]==='pm'&&h<12)h+=12;if(m[3]==='am'&&h===12)h=0;
+  return (h>23||mi>59)?'':pad(h)+':'+pad(mi);
+}
+const LEAD_TIME=new RegExp('^(?:~|from\\s+|at\\s+|around\\s+)?'+TT+'(?:\\s*(?:-|–|—|to|until|till)\\s*'+TT+')?\\s*[:\\-–—|)]?\\s*(.*)$','i');
+const EMOJI_LEAD=/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\s]+/u;
+function emojiHint(e){
+  if(/[🏨🛏🏩🛌🏠🏡⛺]/u.test(e))return {type:'stay'};
+  if(/[🍜🍣🍱🍽🥢🍺🍵☕🍙🍛🍢🍕🍔🥐🍰🍷🍶🥘🍲🍡🍤]/u.test(e))return {type:'food'};
+  if(/[🚆🚄🚅🚇🚊🚝🚈]/u.test(e))return {type:'transport',mode:'train'};
+  if(/[✈🛫🛬]/u.test(e))return {type:'transport',mode:'flight'};
+  if(/[🚌🚎]/u.test(e))return {type:'transport',mode:'bus'};
+  if(/[🚕🚗🚖🚙]/u.test(e))return {type:'transport',mode:'car'};
+  if(/[⛴🚢]/u.test(e))return {type:'transport',mode:'ferry'};
+  if(/[🚶]/u.test(e))return {type:'transport',mode:'walk'};
+  return null;
+}
+function modeOf(s){
+  s=String(s).toLowerCase();
+  if(/\b(flight|fly|flies|flying|airline|jetstar|qantas|virgin|ana|jal|peach|airways|airlines)\b/.test(s))return 'flight';
+  if(/\b(shinkansen|bullet|train|jr|rail|railway|express|metro|subway|monorail|tram|line|nozomi|hikari|sakura|kodama|limited express|romancecar|skyliner|n'ex|haruka)\b/.test(s))return 'train';
+  if(/\b(bus|coach|shuttle)\b/.test(s))return 'bus';
+  if(/\b(taxi|cab|uber|drive|driving|car|rental|hire)\b/.test(s))return 'car';
+  if(/\b(ferry|boat|cruise|ship)\b/.test(s))return 'ferry';
+  if(/\b(walk|walking|on foot)\b/.test(s))return 'walk';
+  return '';
+}
+function classify(s){
+  const l=s.toLowerCase();
+  const arrows=(l.match(/→|->/g)||[]).length;
+  if(/^(check(?:ing)?[- ]?(?:in|out|into))\b/.test(l)||/\b(ryokan|hostel|airbnb|accommodation|accomodation|lodging|capsule hotel)\b/.test(l))return 'stay';
+  if(/\b(shinkansen|train|flight|fly|airport|bus|taxi|ferry|metro|subway|transfer|rental car|drive|driving|depart|departs|arrive|arrives|jr pass|monorail|tram)\b/.test(l)||arrows===1)return 'transport';
+  if(/\b(breakfast|brunch|lunch|dinner|supper|restaurant|ramen|sushi|izakaya|cafe|café|coffee|yakitori|tempura|udon|soba|okonomiyaki|takoyaki|bakery|dessert|snack|street food|food tour|eat|eating|bbq|tonkatsu|wagyu|sake|tea house|bar|kaiseki|omakase|cocktails?)\b/.test(l))return 'food';
+  return 'activity';
+}
+function sectionOf(h){
+  const l=String(h).toLowerCase().replace(/[^a-z &/]/g,'').trim();
+  if(/^(accommodations?|accomodations?|hotels?|lodging|where to stay|stays?)$/.test(l))return 'stay';
+  if(/^(meals?|food|dining|eating|restaurants?|eat|food (&|and|\/) drinks?|meals? ?(\/|&|and) ?food|food ?(\/|&|and) ?meals?)$/.test(l))return 'food';
+  if(/^(activit(y|ies)|sightseeing|things to do|attractions|experiences)$/.test(l))return 'activity';
+  if(/^(transport(ation)?|getting around|travel|transit|transfers?|getting there)$/.test(l))return 'transport';
+  if(/^(travel|transport(ation)?) details?$/.test(l))return 'detail';
+  return null;
+}
+function toHHMMpair(a,b){
+  let s=toHHMM(a),e=b?toHHMM(b):'';
+  if(b&&!/[ap]\.?m/i.test(a)&&/[ap]\.?m/i.test(b)){
+    const suf=/p\.?m/i.test(b)?'pm':'am';
+    const s1=toHHMM(a+suf);
+    if(s1&&s1<=e)s=s1;else{const s2=toHHMM(a+(suf==='pm'?'am':'pm'));if(s2&&s2<=e)s=s2;}
+  }
+  return [s,e];
+}
+function emojiMode(s){
+  const re=/[\u{1F68C}\u{1F68E}\u{1F695}\u{1F697}\u{1F696}\u{1F699}\u{1F686}\u{1F684}\u{1F685}\u{1F687}\u{1F68A}\u{1F69D}\u{1F688}\u2708\u{1F6EB}\u{1F6EC}\u26F4\u{1F6A2}\u{1F6B6}]/u;
+  const m=String(s).match(re);return m?(emojiHint(m[0])||{}).mode||'':'';
+}
+const WK_RE='(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\\.?';
+function dayHeading(raw,base){
+  const hash=/^\s*#{1,6}\s/.test(raw);
+  const bare=raw.trim();
+  if(!hash&&(/^[-•–—+]\s/.test(bare)||/^\*\s/.test(bare)||/^\d{1,2}[.)]\s/.test(bare)))return null;
+  let s=bare.replace(/^#{1,6}\s*/,'').replace(/[*_`]/g,'').trim();
+  s=s.replace(EMOJI_LEAD,'');
+  const dm=s.match(/^(?:day|d)\s*(\d{1,3})\b\s*[:.\-–—|)]?\s*(.*)$/i);
+  const fd=findDate(s,base);
+  const startsDate=new RegExp('^(?:'+WK_RE+',?\\s+)?(?:\\d{1,2}(?:st|nd|rd|th)?\\s+(?:of\\s+)?'+MON_RE+'|'+MON_RE+'\\.?\\s+\\d{1,2}|\\d{4}-\\d{1,2}-\\d{1,2})','i').test(s);
+  if(!dm&&!(fd&&s.length<80&&startsDate))return null;
+  let rest=dm?dm[2]:s;
+  if(fd)rest=rest.replace(fd.text,'');
+  rest=rest.replace(new RegExp('^\\W*'+WK_RE+',?\\s*','i'),'').replace(new RegExp('\\b'+WK_RE+'\\s*$','i'),'').replace(/\(\s*\)/g,'').replace(/^[\s:\-–—|,]+|[\s:\-–—|,]+$/g,'').trim();
+  if(rest.startsWith('(')&&!rest.includes(')'))rest=rest.slice(1).trim();
+  if(rest.endsWith(')')&&!rest.includes('('))rest=rest.slice(0,-1).trim();
+  return {no:dm?+dm[1]:null,date:fd?fd.iso:null,title:rest};
+}
+function cleanName(s){return String(s||'').replace(/\s*[\(\[][^\)\]]*[\)\]]\s*$/,'').replace(/[\s,;:\-–—]+$/,'').trim();}
+function parseTransportRoute(t,allowTo){
+  const re=allowTo?/^(.*?)\s*(?:→|->|=>|➔|➜|–>|\s+to\s+)\s*(.+)$/i:/^(.*?)\s*(?:→|->|=>|➔|➜|–>)\s*(.+)$/;
+  const m=t.match(re);
+  if(!m)return null;
+  let left=m[1].trim(),right=m[2].trim();
+  const fm=left.match(/\bfrom\s+(.+)$/i);if(fm)left=fm[1];
+  left=left.replace(EMOJI_LEAD,'').replace(/^(?:\d{1,2}[:.]\d{2}\s*)?(?:take\s+the\s+|take\s+a\s+|take\s+)?(?:shinkansen|bullet train|train|flight|fly|bus|taxi|ferry|metro|subway|drive|walk|transfer|jr|express)\b\s*/i,'').trim();
+  left=left.split(/[:,;]/).pop().trim();
+  right=right.split(/\s+[—–]\s+|[:,;(\[]/)[0].replace(/\s+(?:via|by|on|dep|arr|departs?|arrives?|at|for)\b.*$/i,'').replace(/[\s.,;:\-–—]+$/,'').trim();
+  left=left.replace(/\s*[\(\[].*$/,'').replace(/[\s.,;:\-–—]+$/,'').trim();
+  if(!left||!right||left.length>60||right.length>60)return null;
+  return {from:left,to:right};
+}
+function splitTitle(t){
+  let title=t,notes='';
+  const m=t.match(/^(.+?)(\s+[—–]\s+|\s+✅\s*)(.*)$/);
+  if(m&&m[1].trim().length>=2){title=m[1].trim();notes=(/✅/.test(m[2])?'✅ ':'')+m[3].replace(/^[\s—–]+/,'').trim();}
+  if(title.length>50){const c=title.match(/^(.{3,}?):\s+(.+)$/);if(c){title=c[1].trim();notes=(c[2]+(notes?'\n'+notes:'')).trim();}}
+  if(title.length>90){notes=(title+(notes?'\n'+notes:'')).trim();title=title.slice(0,85).replace(/\s+\S*$/,'')+'…';}
+  return {title:title.replace(/[\s,;:\-–—]+$/,'').trim(),notes};
+}
+function blankItem(){return {type:'activity',date:'',endDate:'',time:'',endTime:'',slot:'',title:'',place:'',from:'',to:'',mode:'',meal:'',notes:''};}
+const sim=(a,b)=>{const x=norm(a),y=norm(b);if(!x||!y)return 0;return Math.max(jac(a,b),(x.includes(y)||y.includes(x))?.7:0);};
+const GENERIC=new Set('the a at into of check in out drop bags bag luggage travel to hotel and early permitting otherwise store'.split(' '));
+const sharedTokens=(a,b)=>{const A=norm(a).split(' ').filter(w=>w.length>2&&!GENERIC.has(w)),B=new Set(norm(b).split(' '));return A.filter(w=>B.has(w)).length;};
+
+function parseItinerary(text,opts){
+  opts=opts||{};const base=opts.start||null;
+  const lines=String(text||'').replace(/\r/g,'').split('\n');
+  const res={name:'',days:[],items:[],warnings:[],needsStart:false};
+  let day=null,sec=null,hdr=null,lastItem=null,lastIndent=0,lastStay=null,lastDetail=null;
+  const dayObjs=[],events=[];
+  const anyDay=lines.some(l=>l.trim()&&!/^\s*\|/.test(l)&&dayHeading(l,base));
+  const mkDay=info=>{const d={no:info.no,date:info.date,title:info.title||'',notes:'',idx:dayObjs.length};dayObjs.push(d);day=d;sec=null;lastItem=null;lastDetail=null;return d;};
+  const ensureDay=()=>day||mkDay({no:null,date:null,title:''});
+  const push=it=>{const o=Object.assign(blankItem(),it);o._day=ensureDay();res.items.push(o);lastItem=o;return o;};
+  const dayNote=s=>{const d=ensureDay();d.notes=(d.notes?d.notes+'\n':'')+s;};
+  const findPlace=t=>{const pm=t.match(/(?:\bat\b|@|📍)\s*([^,(\[]+?)\s*(?:[,(\[].*)?$/i);return pm?cleanName(pm[1]):'';};
+
+  function addDetail(s){
+    let t=s.replace(/\*\*|__|`/g,'').trim();
+    const isTravel=/^travel\s*:/i.test(t);t=t.replace(/^travel\s*:\s*/i,'');
+    const mode0=emojiMode(t);t=t.replace(EMOJI_LEAD,'').trim();
+    const d=ensureDay(),route=parseTransportRoute(t,false);
+    if(route){
+      let best=null,bs=0;
+      res.items.filter(x=>x._day===d&&x.type==='transport'&&x.to).forEach(x=>{const st=sim(route.to,x.to),sf=sim(route.from,x.from);if(st>=.6&&st+sf*.3>bs){bs=st+sf*.3;best=x;}});
+      if(best){if(!best.notes.includes(t))best.notes=(best.notes?best.notes+'\n':'')+t;lastDetail=best;return;}
+      if(isTravel){
+        const sp=splitTitle(t);
+        const dm=t.match(new RegExp('\\b(?:dep(?:art(?:s|ure)?)?\\.?|leaves?)\\s*~?\\s*(?:at\\s*)?'+TT,'i'));
+        const am=t.match(new RegExp('\\b(?:arr(?:ive[sd]?|ival)?\\.?)\\s*(?:at\\s*)?[A-Za-z ]{0,12}~?\\s*'+TT,'i'));
+        const rest=t.replace(/^[^:—–]*[:—–]\s*/,'');
+        lastDetail=push({type:'transport',title:route.from+' → '+route.to,from:route.from,to:route.to,mode:mode0||modeOf(t)||'other',time:dm?toHHMM(dm[1]):'',endTime:am?toHHMM(am[1]):'',notes:rest&&rest!==t?rest:''});
+        return;
+      }
+    }
+    if(lastDetail&&lastDetail._day===d){if(!lastDetail.notes.includes(t))lastDetail.notes+= (lastDetail.notes?'\n':'')+t;}
+    else dayNote(t);
+  }
+
+  function addFromText(t0,secIn,extra){
+    const hasBold=/\*\*/.test(t0);
+    let t=t0.replace(/\*\*|__|`/g,'').trim();let hint=null;
+    const rawForEmoji=t;
+    const em=t.match(EMOJI_LEAD);if(em){hint=emojiHint(em[0]);t=t.slice(em[0].length).trim();}
+    let time='',endTime='',slot='';
+    const takeTime=()=>{
+      const m=t.match(LEAD_TIME);
+      if(m&&toHHMM(m[1])){const pr=toHHMMpair(m[1],m[2]);time=pr[0];if(pr[1])endTime=pr[1];t=m[3].trim();return true;}
+      return false;
+    };
+    takeTime();
+    if(!time){const tm=t.match(new RegExp('^(.*?\\S)[\\s,;–-]+(?:at\\s+)?'+TT+'\\s*$','i'));if(tm&&toHHMM(tm[2])&&!/\b(arr(?:ive[sd]?|ival)?|dep(?:art(?:s|ure)?)?|leav(?:es|ing)|until|till|to|by|before)\.?\s*$/i.test(tm[1])){time=toHHMM(tm[2]);t=tm[1].trim();}}
+    const sm=t.match(/^(early morning|morning|midday|noon|afternoon|evening|late night|night)\b\s*[:\-–—]\s*(.*)$/i);
+    if(sm&&!time&&sm[2]){const w=sm[1].toLowerCase();if(w==='midday'||w==='noon')time='12:00';else slot=/morning/.test(w)?'Morning':/afternoon/.test(w)?'Afternoon':/evening/.test(w)?'Evening':'Night';t=sm[2].trim();}
+    let label=null;
+    const lm=t.match(/^(accommodation|accomodation|hotel|lodging|stay|check[- ]?in|check[- ]?out|food|meal|meals|dining|breakfast|brunch|lunch|dinner|supper|snack|activity|activities|sightseeing|transport|transportation|transit|transfer|travel|train|shinkansen|flight|bus|taxi|ferry|drive)(?:\s*\([^)]*\))?\s*[:\-–—]\s+(.+)$/i);
+    if(lm){label=lm[1].toLowerCase();t=lm[2].trim();const e2=t.match(EMOJI_LEAD);if(e2){hint=emojiHint(e2[0])||hint;t=t.slice(e2[0].length).trim();}if(!time)takeTime();}
+    if(!t)return;
+    if(/\bsee (below|above)\b/i.test(t))return;
+    const startsCheck=/^check(?:ing)?[- ]?(in|out|into)\b/i.exec(t);
+    if(startsCheck&&!label){events.push({kind:/out/i.test(startsCheck[1])?'out':'in',time,endTime,text:t.slice(startsCheck[0].length),day:ensureDay()});return;}
+    if(!hasBold&&!extra&&!time&&!slot&&!label&&lastItem&&lastItem._day===day&&t.length>45){lastItem.notes=(lastItem.notes?lastItem.notes+'\n':'')+t;return;}
+    let boldT=null;
+    if(!label||true){
+      const bs=[...t0.matchAll(/\*\*([^*]+)\*\*/g)].map(x=>x[1].replace(/[:\s]+$/,'').trim());
+      for(const B of bs){const ix=t.indexOf(B);if(ix>0&&ix<=60&&B.length>=3&&!/^(confirmed|reservation|booked|note|option|options)/i.test(B)&&/[:—–]\s*$/.test(t.slice(0,ix))){boldT={title:B,notes:(t.slice(0,ix).replace(/[\s:—–]+$/,'')+' — '+t.slice(ix+B.length).replace(/^[\s:—–]+/,'')).replace(/\s+—\s*$/,'')};break;}}
+    }
+    const head=boldT?boldT.title:splitTitle(t).title;
+    let type=null,mode='',meal='';
+    if(label){
+      if(/accomm|accomo|hotel|lodging|stay|check/.test(label))type='stay';
+      else if(/food|meal|dining|breakfast|brunch|lunch|dinner|supper|snack/.test(label)){type='food';if(/breakfast|brunch|lunch|dinner|supper|snack/.test(label))meal=label==='brunch'?'breakfast':label==='supper'?'dinner':label;}
+      else if(/activit|sightseeing/.test(label))type='activity';
+      else{type='transport';mode={train:'train',shinkansen:'train',flight:'flight',bus:'bus',taxi:'car',ferry:'ferry',drive:'car'}[label]||'';}
+    }
+    if(!type&&secIn)type=(secIn==='activity'&&/^\W*(breakfast|brunch|lunch|dinner|supper)\b/i.test(head))?'food':secIn;
+    if(!type&&hint)type=hint.type;
+    if(!type)type=classify(head);
+    if(extra&&extra.type)type=extra.type;
+    const isOut=/\bcheck[- ]?out\b|\bcheckout\b/i.test((label||'')+' '+t);
+    if(type==='stay'){
+      let name=t.replace(/\b(?:check[- ]?in|check[- ]?out|checkout|checking in|stay(?:ing)? at|stay)\b[\s:\-–—]*/ig,'').replace(/^[\s:\-–—@,]+/,'').trim();
+      let nights=0;const nm=name.match(/\(?\b(\d{1,2})\s*nights?\)?/i);if(nm){nights=+nm[1];name=name.replace(nm[0],'').trim();}
+      name=name.replace(/[\s,;:\-–—]+$/,'').replace(/^at\s+/i,'').trim();
+      if(/^(in transit|overnight|n\/a|none|tbc|tba|tbd|-+|—)/i.test(name))return;
+      if(isOut&&(!name||name.length<3)){if(lastStay){lastStay._out=ensureDay();}return;}
+      if(isOut){const ex=res.items.find(x=>x.type==='stay'&&norm(x.title)===norm(name));if(ex){ex._out=ensureDay();return;}}
+      const o=push({type:'stay',title:name||t,time,endTime,slot,place:name||t});
+      if(nights)o._nights=nights;if(isOut)o._out=day;
+      lastStay=o;return;
+    }
+    const sp=(boldT&&type!=='transport')?boldT:splitTitle(t);let notes=(extra&&extra.notes||'');if(sp.notes)notes=notes?sp.notes+'\n'+notes:sp.notes;
+    if(type==='food'){
+      const mm=(label||'')+' '+head;const mt=mm.match(/\b(breakfast|brunch|lunch|dinner|supper|snack|coffee)\b/i);
+      if(!meal&&mt)meal=/brunch/i.test(mt[1])?'breakfast':/supper/i.test(mt[1])?'dinner':/coffee/i.test(mt[1])?'snack':mt[1].toLowerCase();
+      let ft=sp.title||t;
+      if(label&&meal&&!new RegExp('\\b'+meal+'\\b','i').test(ft))ft=meal[0].toUpperCase()+meal.slice(1)+': '+ft;
+      push({type:'food',title:ft,time,endTime,slot,place:findPlace(head),meal,notes});return;
+    }
+    if(type==='transport'){
+      const route=parseTransportRoute(t,!!label||secIn==='transport');
+      mode=mode||(hint&&hint.mode)||emojiMode(rawForEmoji)||modeOf(t)||'other';
+      let t2=time,et=endTime;
+      if(!t2){const dm=t.match(new RegExp('\\b(?:dep(?:art(?:s|ure)?)?\\.?|leaves?|leaving)\\s*~?\\s*(?:at\\s*)?'+TT,'i'));if(dm)t2=toHHMM(dm[1]);}
+      if(!et){const am=t.match(new RegExp('\\b(?:arr(?:ive[sd]?|ival)?\\.?)\\s*~?\\s*(?:at\\s*)?'+TT,'i'));if(am)et=toHHMM(am[1]);}
+      const title=route?(sp.title.includes('→')||/\sto\s/i.test(sp.title)?sp.title:t):sp.title;
+      push({type:'transport',title:title.replace(/[\s,;:\-–—]+$/,''),time:t2,endTime:et,slot,mode,from:route?route.from:'',to:route?route.to:'',notes});return;
+    }
+    push({type:'activity',title:sp.title||t,time,endTime,slot,place:findPlace(head),notes});
+  }
+
+  function tableRow(cells){
+    const H=hdr||[];const col=re=>H.findIndex(h=>re.test(h));
+    const iDay=col(/^(day|date|day ?\/ ?date|day no\.?)$/),iTime=col(/time|when|start/),iTitle=col(/activit|what|plan|description|detail|event|item|itinerary|meal|food|stay|accommodation|hotel|restaurant|do\b/),
+      iTrans=col(/transport|getting|travel|how|route|train|transit/),iPlace=col(/location|place|where|area/),iType=col(/^(type|category|section)$/),iNote=col(/note|tip|comment|remark/);
+    if(iDay>=0&&cells[iDay]){const dh=dayHeading('## '+cells[iDay],base)||(findDate(cells[iDay],base)?{no:null,date:findDate(cells[iDay],base).iso,title:''}:null);if(dh&&(!day||dh.date!==day.date||dh.no!==day.no))mkDay(dh);}
+    let ti=iTitle>=0?iTitle:cells.findIndex((c,i)=>i!==iDay&&i!==iTime&&c&&!/^-+$/.test(c));
+    const title=(cells[ti]||'').trim();const tcell=iTime>=0?(cells[iTime]||''):'';
+    let tm='';const mt=tcell.match(new RegExp(TT,'i'));if(mt)tm=toHHMM(mt[1]);
+    const notes=iNote>=0?(cells[iNote]||''):'';
+    const typeCell=iType>=0?(cells[iType]||'').toLowerCase():'';
+    let forced=null;if(typeCell)forced=sectionOf(typeCell)||(/stay|hotel|accom/.test(typeCell)?'stay':/food|meal|eat|dining/.test(typeCell)?'food':/transport|travel/.test(typeCell)?'transport':/activ/.test(typeCell)?'activity':null);
+    if(!forced&&ti>=0&&H[ti]){forced=/meal|food|restaurant/.test(H[ti])?'food':/stay|accommodation|hotel/.test(H[ti])?'stay':null;}
+    if(title&&!/^[-–—]+$/.test(title)){
+      const before=res.items.length;
+      addFromText((tm?tm+' ':'')+title,forced,{notes});
+      if(iPlace>=0&&cells[iPlace]&&res.items.length>before){const o=res.items[res.items.length-1];if(!o.place)o.place=cells[iPlace];}
+    }
+    if(iTrans>=0&&cells[iTrans]&&!/^[-–—n\/a]+$/i.test(cells[iTrans].trim())){addFromText(cells[iTrans],'transport',{});}
+  }
+
+  for(let li=0;li<lines.length;li++){
+    const raw=lines[li];const s=raw.trim();if(!s)continue;
+    if(/^[-=_*•]{3,}$/.test(s))continue;
+    if(s[0]==='|'){
+      const cells=s.replace(/^\||\|\s*$/g,'').split('|').map(c=>c.replace(/\*\*|__/g,'').trim());
+      if(cells.every(c=>/^:?-{2,}:?$/.test(c)))continue;
+      const nxt=(lines[li+1]||'').trim();
+      if(/^\|?\s*:?-{2,}/.test(nxt)){hdr=cells.map(c=>c.toLowerCase());continue;}
+      if(anyDay&&!day)continue;
+      tableRow(cells);continue;
+    }
+    hdr=null;
+    const dh=dayHeading(raw,base);
+    if(dh){mkDay(dh);continue;}
+    if(/^\s*#{1,6}\s/.test(raw)){
+      const h=s.replace(/^#{1,6}\s*/,'').replace(/[*_`]/g,'').replace(EMOJI_LEAD,'').trim();
+      const sc=sectionOf(h);
+      if(sc){sec=sc;}
+      else if(!res.name&&!day){res.name=h;}
+      else if(anyDay){day=null;sec=null;lastItem=null;lastDetail=null;}   // a non-day heading (e.g. a summary table) ends the day
+      else if(day&&!day.title&&!res.items.some(x=>x._day===day)){day.title=h;}
+      continue;
+    }
+    if(anyDay&&!day)continue;                                        // preamble / notes before the first day
+    const bare=s.replace(/^[*_\s]+|[*_\s:]+$/g,'').replace(EMOJI_LEAD,'');
+    const isBullet=/^\s*(?:[-•–—+]|\*(?!\*)|\d{1,2}[.)])\s+/.test(raw);
+    if(!isBullet){
+      const sc=sectionOf(bare);
+      if(sc&&bare.length<40&&!/:\s*\S/.test(s)){sec=sc;lastItem=null;lastDetail=null;continue;}
+    }
+    const indent=raw.match(/^\s*/)[0].replace(/\t/g,'  ').length;
+    const body=s.replace(/^(?:[-•–—+]|\*(?!\*)|\d{1,2}[.)])\s+/,'');
+    if(!day&&!res.name&&!isBullet&&s.length<90&&!LEAD_TIME.test(s.replace(/\*\*/g,''))){res.name=s.replace(/[*_`#]/g,'').trim();continue;}
+    if(isBullet&&lastItem&&indent>=lastIndent+2&&!LEAD_TIME.test(body.replace(/\*\*/g,''))){
+      const note=body.replace(/\*\*/g,'');
+      lastItem.notes=(lastItem.notes?lastItem.notes+'\n':'')+note;continue;
+    }
+    if(sec==='detail'){addDetail(body);if(isBullet)lastIndent=indent;continue;}
+    if(!isBullet&&!/^\*\*/.test(s)&&!LEAD_TIME.test(s.replace(/\*\*/g,''))&&!/^[A-Za-z ]{3,22}:\s/.test(s)&&day){dayNote(s);continue;}
+    const before=res.items.length;
+    addFromText(body,sec);
+    if(res.items.length>before&&isBullet)lastIndent=indent;
+  }
+
+  /* resolve dates */
+  const dated=dayObjs.filter(d=>d.date);
+  dayObjs.forEach(d=>{
+    if(d.date)return;
+    if(opts.start&&d.no)d.date=addDays(opts.start,d.no-1);
+    else if(dated.length){
+      let best=null,bd=1e9;dated.forEach(x=>{const dist=Math.abs(x.idx-d.idx);if(dist<bd){bd=dist;best=x;}});
+      const off=(d.no&&best.no)?d.no-best.no:d.idx-best.idx;d.date=addDays(best.date,off);
+    }else if(opts.start)d.date=addDays(opts.start,d.no?d.no-1:d.idx);
+  });
+  if(dayObjs.some(d=>!d.date)){res.needsStart=true;res.warnings.push('Some days have no date. Enter the first day’s date and preview again.');}
+  if(!dayObjs.length)res.warnings.push('No day headings were found. Use headings such as “Day 1 – Mon 7 Dec” so items land on the right day.');
+  res.items=res.items.filter(i=>i._day.date);
+  res.items.forEach(i=>{i.date=i._day.date;});
+  /* stays: explicit nights / check-out, then merge consecutive-day repeats */
+  res.items.filter(i=>i.type==='stay').forEach(i=>{
+    if(i._out&&i._out.date&&i._out.date>i.date)i.endDate=i._out.date;
+    else if(i._nights)i.endDate=addDays(i.date,i._nights);
+  });
+  const stays=res.items.filter(i=>i.type==='stay'&&!i.endDate).sort((a,b)=>a.date.localeCompare(b.date));
+  const drop=new Set();
+  stays.forEach(a=>{
+    if(drop.has(a))return;
+    let last=a.date;
+    stays.forEach(b=>{if(b!==a&&!drop.has(b)&&sim(b.title,a.title)>=.6&&b.date>=last&&diffDays(last,b.date)<=1){last=b.date;drop.add(b);}});
+    a.endDate=addDays(last,1);
+  });
+  res.items=res.items.filter(i=>!drop.has(i));
+  res.items.forEach(i=>{if(i.type==='stay'&&!i.endDate)i.endDate=addDays(i.date,1);});
+  /* check-in / check-out lines set the times on the matching stay */
+  events.forEach(ev=>{
+    const dt=ev.day.date;if(!dt)return;
+    const st=res.items.filter(i=>i.type==='stay'&&sharedTokens(i.title,ev.text)>0&&(ev.kind==='in'?i.date===dt:(i.date<=dt&&dt<=i.endDate)));
+    const s=st[0];if(!s)return;
+    if(ev.kind==='in'){if(!s.time)s.time=ev.time;}else if(!s.endTime)s.endTime=ev.time;
+  });
+  /* the same meal listed under Activities (timed) and Meals (untimed) becomes one item */
+  const gone=new Set();
+  const foods=res.items.filter(i=>i.type==='food');
+  foods.forEach((a,ai)=>{
+    if(gone.has(a))return;
+    foods.forEach((b,bi)=>{
+      if(bi<=ai||gone.has(b)||gone.has(a)||a.date!==b.date)return;
+      const same=(a.meal&&a.meal===b.meal&&(!!a.time!==!!b.time))||jac(a.title,b.title)>=.6;
+      if(!same)return;
+      const keep=a.time?a:(b.time?b:a),other=keep===a?b:a;
+      const extra=other.notes&&other.notes!==keep.notes&&!keep.notes.includes(other.notes)?other.notes:'';
+      keep.notes=[keep.notes,extra].filter(Boolean).join('\n');
+      if(!keep.place&&other.place)keep.place=other.place;
+      if(!keep.meal&&other.meal)keep.meal=other.meal;
+      gone.add(other);
+    });
+  });
+  res.items=res.items.filter(i=>!gone.has(i));
+  /* "Depart X" / "Arrive Y" / "Walk to Z" marker lines fold into the matching route leg */
+  const trs=res.items.filter(i=>i.type==='transport'),rm=new Set();
+  const legs=trs.filter(l=>l.from&&l.to);
+  const mk=res.items.filter(i=>(i.type==='transport'||i.type==='activity'||i.type==='food')&&!i.from&&!i.to&&i.time&&/^(flight|depart|arrive|land|travel|walk|head|go)\b/i.test(i.title));
+  const tok=s=>(norm(s).split(' ').filter(w=>w.length>2&&w!=='the'&&w!=='hotel')[0])||'';
+  mk.forEach(m=>{
+    const dep=/^(depart|flight)/i.test(m.title),arr=/^(arrive|land)/i.test(m.title);
+    const cands=legs.filter(l=>l.date===m.date&&(dep?(l.time===m.time||(!l.time&&(/^(the )?hotel\b/i.test(l.from)||(tok(l.from)&&norm(m.title).includes(tok(l.from)))))):arr?(!l.endTime&&tok(l.to)&&norm(m.title).includes(tok(l.to))):(tok(l.to)&&norm(m.title).includes(tok(l.to)))));
+    if(!cands.length)return;
+    const l=cands.find(x=>x.time===m.time)||cands.find(x=>!x.time)||cands[0];
+    if(arr){if(!l.endTime)l.endTime=m.time;}
+    else{if(!l.time)l.time=m.time;if(!l.endTime&&m.endTime)l.endTime=m.endTime;}
+    if(!/^flight/i.test(m.title))l.notes=(l.notes?l.notes+'\n':'')+m.title;
+    rm.add(m);
+  });
+  res.items=res.items.filter(i=>!rm.has(i));
+  res.items.forEach(i=>{delete i._day;delete i._out;delete i._nights;});
+  res.days=dayObjs.filter(d=>d.date).map(d=>({date:d.date,title:d.title,notes:d.notes}));
+  return res;
+}
+
+/* ---- other formats ---- */
+function parseCSV(text){
+  const rows=[];let row=[],cur='',q=false;
+  for(let i=0;i<text.length;i++){const c=text[i];
+    if(q){if(c==='"'){if(text[i+1]==='"'){cur+='"';i++;}else q=false;}else cur+=c;}
+    else if(c==='"')q=true;else if(c===','){row.push(cur);cur='';}
+    else if(c==='\n'){row.push(cur);rows.push(row);row=[];cur='';}else if(c!=='\r')cur+=c;}
+  if(cur||row.length){row.push(cur);rows.push(row);}
+  return rows.filter(r=>r.some(c=>c.trim()));
+}
+function parseAny(text,opts){
+  const t=String(text||'').trim();
+  if(/^[\[{]/.test(t)){
+    try{
+      const o=JSON.parse(t);const arr=Array.isArray(o)?o:(o.items||[]);
+      const res={name:(o.trip&&o.trip.name)||o.name||'',days:[],items:[],warnings:[],needsStart:false};
+      for(const x of arr){
+        const it=Object.assign(blankItem(),{type:TYPE_BY_ID[x.type]?x.type:'activity'});
+        for(const f of [...IMPORT_FIELDS,'notes','ref','link','address','mapLink'])if(x[f]!=null)it[f]=String(x[f]);
+        if(!parseISO(it.date)){res.warnings.push('Skipped an item with no valid date: '+(it.title||'?'));continue;}
+        res.items.push(it);
+      }
+      if(o.trip&&o.trip.days)for(const d of Object.keys(o.trip.days))res.days.push({date:d,title:o.trip.days[d].title||''});
+      return res;
+    }catch(e){}
+  }
+  const first=t.split('\n')[0]||'';
+  if(!first.includes('|')&&!/^#/.test(first)&&(first.match(/,/g)||[]).length>=2&&/date/i.test(first)){
+    const rows=parseCSV(t),h=rows[0].map(c=>c.trim().toLowerCase());
+    const col=n=>h.findIndex(x=>x===n||x.startsWith(n));
+    const res={name:'',days:[],items:[],warnings:[],needsStart:false};
+    for(const r of rows.slice(1)){
+      const g=n=>{const i=col(n);return i>=0?(r[i]||'').trim():'';};
+      const dt=findDate(g('date'),opts&&opts.start);if(!dt){res.warnings.push('Skipped a row with no valid date.');continue;}
+      const it=Object.assign(blankItem(),{date:dt.iso,time:toHHMM(g('time')||g('start')),endTime:toHHMM(g('end')),title:g('title')||g('activity')||g('item'),place:g('place')||g('location'),from:g('from'),to:g('to'),mode:g('mode'),notes:g('notes')});
+      const ty=g('type')||g('category');it.type=sectionOf(ty)||(/stay|hotel|accom/i.test(ty)?'stay':/food|meal/i.test(ty)?'food':/transport|travel/i.test(ty)?'transport':/activ/i.test(ty)?'activity':classify(it.title));
+      if(it.type==='stay')it.endDate=findDate(g('end date')||g('check'),opts&&opts.start)?.iso||addDays(it.date,1);
+      if(!it.title)continue;res.items.push(it);
+    }
+    return res;
+  }
+  return parseItinerary(t,opts);
+}
+
+/* ============ MERGE ============ */
+const keyOf=i=>i.type+'|'+i.date+'|'+norm(i.title);
+function dice(a,b){a=norm(a).replace(/ /g,'');b=norm(b).replace(/ /g,'');if(a.length<2||b.length<2)return 0;const bg=s=>{const m=new Map();for(let i=0;i<s.length-1;i++){const g=s.slice(i,i+2);m.set(g,(m.get(g)||0)+1);}return m;};const A=bg(a),B=bg(b);let n=0;A.forEach((v,k)=>{if(B.has(k))n+=Math.min(v,B.get(k));});return 2*n/(a.length+b.length-2);}
+function jac(a,b){const A=new Set(norm(a).split(' ').filter(Boolean)),B=new Set(norm(b).split(' ').filter(Boolean));if(!A.size||!B.size)return 0;let n=0;A.forEach(x=>{if(B.has(x))n++;});return n/(A.size+B.size-n);}
+const snap=n=>{const o={};for(const f of IMPORT_FIELDS)o[f]=n[f]||'';return o;};
+function hasUserContent(i){return !!(i.notes&&i.notes.trim())||(i.atts&&i.atts.length)||i.mapLink||i.coordManual||i.link||i.ref;}
+function planImport(parsed,tripId){
+  const existing=data.items.filter(i=>i.trip===tripId);
+  const used=new Set(),rows=[];
+  const idx=new Map();existing.forEach(i=>{const k=keyOf(i);if(!idx.has(k))idx.set(k,[]);idx.get(k).push(i);});
+  let pending=[];
+  parsed.items.forEach(n=>{const a=idx.get(keyOf(n));const m=a&&a.find(x=>!used.has(x.id));if(m){used.add(m.id);rows.push({n,m,how:'exact'});}else pending.push(n);});
+  const p2=[];
+  pending.forEach(n=>{
+    const cand=existing.filter(x=>!used.has(x.id)&&x.type===n.type&&norm(x.title)===norm(n.title));
+    const same=pending.filter(q=>q.type===n.type&&norm(q.title)===norm(n.title)).length;
+    if(cand.length===1&&same===1){used.add(cand[0].id);rows.push({n,m:cand[0],how:'moved'});}else p2.push(n);
+  });
+  const p3=[];
+  p2.forEach(n=>{
+    let best=null,bs=0;existing.forEach(x=>{if(used.has(x.id)||x.type!==n.type||x.date!==n.date)return;const s=Math.max(jac(n.title,x.title),dice(n.title,x.title)-.2);if(s>bs){bs=s;best=x;}});
+    if(best&&bs>=.5){used.add(best.id);rows.push({n,m:best,how:'renamed'});}else p3.push(n);
+  });
+  p3.forEach(n=>rows.push({n,m:null,how:'new'}));
+  rows.forEach(r=>{
+    r.changes=[];
+    if(!r.m)return;
+    const m=r.m;
+    for(const f of IMPORT_FIELDS){
+      const nv=r.n[f]||'';
+      if(m.imp){if(nv!==(m.imp[f]||'')&&nv!==(m[f]||''))r.changes.push(f);}
+      else if(!(m[f]||'')&&nv)r.changes.push(f);
+    }
+    if(!(m.notes||'').trim()&&r.n.notes)r.changes.push('notes');
+  });
+  const missing=existing.filter(x=>x.src==='import'&&!used.has(x.id));
+  const count={new:0,upd:0,same:0,mv:0};
+  rows.forEach(r=>{if(!r.m)count.new++;else if(r.how==='moved'||r.how==='renamed')count.mv++;else if(r.changes.length)count.upd++;else count.same++;});
+  return {rows,missing,count};
+}
+function applyImport(plan,parsed,o){
+  try{localStorage.setItem(LS_PREV,JSON.stringify(data));}catch(e){}
+  let t=data.trips.find(x=>x.id===o.tripId);
+  if(!t){t={id:o.tripId||uid(),name:o.name||parsed.name||'New trip',start:'',end:'',region:o.region||'',days:{},created:Date.now()};data.trips.push(t);}
+  if(o.region&&!t.region)t.region=o.region;
+  for(const r of plan.rows){
+    if(!r.m){
+      const it=Object.assign({id:uid(),trip:t.id,ref:'',link:'',address:'',mapLink:'',notes:'',atts:[],coord:null,fromCoord:null,toCoord:null,src:'import'},r.n);
+      it.imp=snap(r.n);data.items.push(it);continue;
+    }
+    const m=r.m;
+    for(const f of r.changes){
+      if(f==='notes'){m.notes=r.n.notes;continue;}
+      m[f]=r.n[f]||'';
+      if(!m.coordManual){if(f==='place'||f==='title')m.coord=null;if(f==='from')m.fromCoord=null;if(f==='to')m.toCoord=null;}
+    }
+    if(m.src==='import')m.imp=snap(r.n);
+    delete m.gone;
+  }
+  plan.missing.forEach(m=>{
+    if(o.removeMissing&&!hasUserContent(m)){data.items=data.items.filter(x=>x.id!==m.id);}
+    else m.gone=true;
+  });
+  for(const d of parsed.days){
+    const cur=t.days[d.date]||(t.days[d.date]={title:'',notes:''});
+    if(d.title&&(!cur.title||cur.title===cur.impTitle))cur.title=d.title;
+    cur.impTitle=d.title;
+    if(d.notes&&(!cur.notes||cur.notes===cur.impNotes))cur.notes=d.notes;
+    cur.impNotes=d.notes||'';
+  }
+  const r=tripRange(Object.assign({},t,{start:'',end:''}));
+  if(r.start){t.start=r.start;t.end=r.end;}
+  return t;
+}
+
+/* ============ GEOCODING & MAPS ============ */
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const geoQueue=[];let geoBusy=false;
+function geocode(q){
+  q=String(q||'').trim();if(!q)return Promise.resolve(null);
+  const key=norm(q);if(data.geo[key]!==undefined)return Promise.resolve(data.geo[key]);
+  return new Promise(res=>{geoQueue.push({q,key,res});pumpGeo();});
+}
+async function pumpGeo(){
+  if(geoBusy)return;geoBusy=true;
+  while(geoQueue.length){
+    const j=geoQueue.shift();
+    if(data.geo[j.key]!==undefined){j.res(data.geo[j.key]);continue;}
+    try{
+      const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=en&q='+encodeURIComponent(j.q));
+      if(!r.ok){j.res(null);}
+      else{const a=await r.json();const v=a[0]?{lat:+a[0].lat,lng:+a[0].lon}:null;data.geo[j.key]=v;j.res(v);}
+    }catch(e){j.res(null);}
+    await sleep(1100);
+  }
+  geoBusy=false;
+}
+function geoQ(it,which){
+  const reg=(trip()&&trip().region)||'';
+  let base=which==='from'?it.from:which==='to'?it.to:(it.address||it.place||it.title);
+  if(which!=='place'&&/^(the )?hotel$/i.test(String(base||'').trim())){const s=itemsOnDay(it.date,'stay')[0];if(s)base=s.address||s.title;}
+  return base?[base,reg].filter(Boolean).join(', '):'';
+}
+const hasL=()=>typeof window.L!=='undefined';
+function arcPoints(a,b){
+  const mx=(a.lat+b.lat)/2,my=(a.lng+b.lng)/2,dx=b.lng-a.lng,dy=b.lat-a.lat;
+  const c={lat:mx+dx*.18,lng:my-dy*.18};const pts=[];
+  for(let i=0;i<=40;i++){const t=i/40,u=1-t;pts.push([u*u*a.lat+2*u*t*c.lat+t*t*b.lat,u*u*a.lng+2*u*t*c.lng+t*t*b.lng]);}
+  return pts;
+}
+async function drawRoute(map,a,b,mode,color){
+  let note='Straight line between the two places — not the actual track or road.';
+  let pts=[[a.lat,a.lng],[b.lat,b.lng]],dash='6 6';
+  if(mode==='flight'){pts=arcPoints(a,b);note='Flight path shown as an arc.';}
+  else if(mode==='car'||mode==='bus'){
+    try{
+      const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+a.lng+','+a.lat+';'+b.lng+','+b.lat+'?overview=full&geometries=geojson');
+      if(r.ok){const j=await r.json();if(j.routes&&j.routes[0]){pts=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);dash=null;note='Driving route (approximate road line).';}}
+    }catch(e){}
+  }
+  const line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);
+  return {line,note};
+}
+const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0'};
+function pinIcon(type,label){return L.divIcon({className:'',html:'<div class="pin k-'+type+'">'+esc(label||'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
+function newMap(el){
+  const m=L.map(el,{scrollWheelZoom:true});
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(m);
+  m.setView([20,0],2);return m;
+}
+
+/* ============ RENDERING ============ */
+function typeCount(date,type){return itemsOnDay(date,type).length;}
+function renderTripSel(){
+  const s=$('#tripSel');
+  s.innerHTML=data.trips.length?data.trips.map(t=>'<option value="'+esc(t.id)+'"'+(t.id===selTrip?' selected':'')+'>'+esc(t.name)+'</option>').join(''):'<option>No trips yet</option>';
+  s.disabled=!data.trips.length;
+}
+function renderViewSeg(){$$('#viewSeg button').forEach(b=>b.classList.toggle('on',b.dataset.view===view));}
+function renderRail(){
+  const t=trip(),r=$('#rail');
+  if(!t){r.innerHTML='';return;}
+  const days=tripDays(t);
+  r.innerHTML=days.map((d,i)=>{
+    const dd=(t.days[d]||{}),ic=TYPES.map(x=>{const n=typeCount(d,x.id);return n?'<span class="k-'+x.id+'">'+ico(x.icon)+n+'</span>':'';}).join('');
+    return '<button class="rd'+(d===selDate?' sel':'')+(ic?'':' empty')+'" data-act="goday" data-date="'+d+'"><div class="n">Day '+(i+1)+'</div><div class="d">'+esc(fmtShort(d))+'</div><div class="tt">'+esc(dd.title||'')+'</div><div class="ic">'+ic+'</div></button>';
+  }).join('')||'<div class="hint" style="padding:8px">No days yet.</div>';
+}
+function badgesHtml(it){
+  const b=[];
+  if(it.notes&&it.notes.trim())b.push('<span title="Has notes">'+ico('note')+'</span>');
+  const na=it.atts.filter(a=>!a.map).length;if(na)b.push('<span title="Attachments">'+ico('clip')+na+'</span>');
+  if(it.coord||it.fromCoord||it.toCoord||it.mapLink||it.atts.some(a=>a.map))b.push('<span title="Has a map">'+ico('map')+'</span>');
+  return b.length?'<div class="badges">'+b.join('')+'</div>':'';
+}
+function cardHtml(it,date){
+  let tm='',tag='';
+  if(it.type==='stay'){
+    if(date===it.date){tag='<span class="tag">Check-in</span>';tm=it.time||'';}
+    else if(date===it.endDate){tag='<span class="tag">Check-out</span>';tm=it.endTime||'';}
+    else tag='<span class="tag">Staying</span>';
+  }else tm=it.time?(it.time+(it.endTime?'–'+it.endTime:'')):(it.slot||'');
+  let sub=[];
+  if(it.type==='transport'){if(it.from||it.to)sub.push(esc(it.from)+' → '+esc(it.to));if(it.ref)sub.push(esc(it.ref));}
+  else if(it.type==='food'){const ml=(MEALS.find(m=>m[0]===it.meal)||[])[1];if(ml&&it.meal)sub.push(esc(ml));if(it.place)sub.push(esc(it.place));}
+  else if(it.type==='stay'){if(it.address||it.place)sub.push(esc(it.address||it.place));if(date===it.date&&it.endDate)sub.push('until '+esc(fmtShort(it.endDate)));}
+  else if(it.place)sub.push(esc(it.place));
+  return '<div class="card k-'+it.type+'" data-act="open" data-id="'+esc(it.id)+'" tabindex="0"><div class="ico">'+ico(iconFor(it))+'</div><div class="cb"><div class="t1">'+(tm?'<span class="tm">'+esc(tm)+'</span>':'')+esc(it.title)+tag+(it.gone?'<span class="mini" title="This item was not in the latest imported itinerary">not in latest import</span>':'')+'</div>'+
+    (sub.length?'<div class="t2">'+sub.join(' · ')+'</div>':'')+(it.notes&&it.notes.trim()?'<div class="nt">'+esc(it.notes)+'</div>':'')+'</div>'+badgesHtml(it)+'</div>';
+}
+function renderEmpty(){
+  $('#main').innerHTML='<div class="empty"><h2 style="margin:0 0 6px;color:var(--ink)">No trip yet</h2><p>Import an itinerary to build a day-by-day plan, or start an empty trip.</p><p><button class="btn primary" data-act="import">Import itinerary</button> <button class="btn" data-act="newtrip">New empty trip</button></p></div>';
+}
+function renderDay(){
+  const t=trip(),days=tripDays(t);
+  if(!days.length){$('#main').innerHTML='<div class="empty"><p>This trip has no dates yet. Open <b>Trip</b> to set a start date, or import an itinerary.</p></div>';return;}
+  const i=days.indexOf(selDate),dd=t.days[selDate]||{};
+  let h='<div class="dayhead"><div class="row1"><button class="btn sm nop" data-act="prevday" '+(i<=0?'disabled':'')+'>‹</button><h2>Day '+(i+1)+' · '+esc(fmtLong(selDate))+'</h2><button class="btn sm nop" data-act="nextday" '+(i>=days.length-1?'disabled':'')+'>›</button></div>'+
+    '<input class="dtitle" id="dayTitle" placeholder="Where / theme for the day (e.g. Tokyo – Asakusa & Ueno)" value="'+esc(dd.title||'')+'">'+
+    '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>';
+  for(const ty of TYPES){
+    const its=itemsOnDay(selDate,ty.id);
+    h+='<section class="sec k-'+ty.id+'"><header>'+ico(ty.icon)+'<span>'+ty.label+'</span><span class="cnt">'+(its.length?its.length:'')+'</span><span class="sp"></span><button class="btn sm" data-act="add" data-type="'+ty.id+'">+ Add</button></header>'+
+      (its.length?'<div class="list">'+its.map(x=>cardHtml(x,selDate)).join('')+'</div>':'<div class="none">Nothing planned.</div>')+'</section>';
+  }
+  $('#main').innerHTML=h;
+}
+function renderCal(){
+  const t=trip(),r=tripRange(t);
+  if(!r.start){$('#main').innerHTML='<div class="empty"><p>No dates yet.</p></div>';return;}
+  const dow=d=>(parseISO(d).getDay()+6)%7;
+  const start=addDays(r.start,-dow(r.start)),end=addDays(r.end,6-dow(r.end));
+  let h='<div class="cal"><div class="hd">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="wk" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">';
+  for(let d=start;d<=end;d=addDays(d,1)){
+    const inn=d>=r.start&&d<=r.end,dt=parseISO(d);
+    if(!inn){h+='<div class="cd out"><div class="dn"><span>'+dt.getDate()+(dt.getDate()===1?' '+MN[dt.getMonth()]:'')+'</span></div></div>';continue;}
+    const chips=[];
+    for(const ty of TYPES)for(const it of itemsOnDay(d,ty.id)){
+      if(it.type==='stay'&&d!==it.date&&d!==it.endDate)continue;
+      chips.push('<div class="chip k-'+it.type+'">'+ico(iconFor(it))+'<span>'+esc((it.type==='stay'?(d===it.date?'In: ':'Out: '):(it.time?it.time+' ':''))+it.title)+'</span></div>');
+    }
+    const dd=t.days[d]||{};
+    h+='<div class="cd'+(d===selDate?' sel':'')+'" data-act="goday" data-date="'+d+'" title="'+esc(dd.title||'')+'"><div class="dn"><b>'+dt.getDate()+(dt.getDate()===1||d===r.start?' '+MN[dt.getMonth()]:'')+'</b><span>Day '+(diffDays(r.start,d)+1)+'</span></div>'+
+      (dd.title?'<div class="more" style="color:var(--ink);font-weight:600">'+esc(dd.title)+'</div>':'')+chips.slice(0,4).join('')+(chips.length>4?'<div class="more">+'+(chips.length-4)+' more</div>':'')+'</div>';
+  }
+  $('#main').innerHTML=h+'</div></div>';
+}
+function renderAgenda(){
+  const t=trip(),days=tripDays(t);
+  if(!days.length){$('#main').innerHTML='<div class="empty"><p>No dates yet.</p></div>';return;}
+  $('#main').innerHTML=days.map((d,i)=>{
+    const dd=t.days[d]||{};
+    const its=[];for(const ty of TYPES)itemsOnDay(d,ty.id).forEach(x=>{if(x.type==='stay'&&d!==x.date&&d!==x.endDate)return;its.push(x);});
+    its.sort((a,b)=>(a.type==='stay'?'00:00':sortKey(a)).localeCompare(b.type==='stay'?'00:00':sortKey(b)));
+    return '<div class="agday"><h3>Day '+(i+1)+' · '+esc(fmtLong(d))+(dd.title?' — '+esc(dd.title):'')+'</h3>'+(dd.notes?'<div class="hint" style="margin-bottom:4px;white-space:pre-wrap">'+esc(dd.notes)+'</div>':'')+
+      (its.length?its.map(x=>'<div class="agi k-'+x.type+'" data-act="open" data-id="'+esc(x.id)+'"><span class="tm">'+esc(x.type==='stay'?(d===x.date?'In':'Out'):(x.time||x.slot||''))+'</span><span class="ico">'+ico(iconFor(x))+'</span><span><b>'+esc(x.title)+'</b>'+(x.type==='transport'&&(x.from||x.to)?' <span class="hint">'+esc(x.from)+' → '+esc(x.to)+'</span>':x.place?' <span class="hint">'+esc(x.place)+'</span>':'')+'</span></div>').join(''):'<div class="hint">Nothing planned.</div>')+'</div>';
+  }).join('');
+}
+let bigMap=null;
+function renderMapView(){
+  const t=trip(),days=tripDays(t);
+  $('#main').innerHTML='<div class="row1" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><select id="mapDay" class="btn" style="padding:6px 8px"><option value="">All days</option>'+days.map((d,i)=>'<option value="'+d+'"'+(d===mapDayFilter?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select><button class="btn" data-act="locate">Find places on map</button><span class="hint" id="mapStat"></span></div><div id="bigmap"></div><div class="mapnote">Place pins are looked up from the item’s place, address or title (plus the trip’s place hint). Open an item and drag its pin if a spot is wrong. Transport legs are drawn between their From and To points.</div>';
+  $('#mapDay').onchange=e=>{mapDayFilter=e.target.value;drawBigMap();};
+  drawBigMap();
+}
+let mapDayFilter='';
+async function drawBigMap(){
+  const el=$('#bigmap');if(!el)return;
+  if(!hasL()){el.innerHTML='<div class="empty" style="margin:20px">The map library could not load (offline?). Maps need an internet connection.</div>';return;}
+  if(bigMap){bigMap.remove();bigMap=null;}
+  const m=bigMap=newMap(el);const bounds=[];let n=0,missing=0;
+  const its=tripItems().filter(i=>!mapDayFilter||(i.type==='stay'?(i.date<=mapDayFilter&&mapDayFilter<=(i.endDate||i.date)):i.date===mapDayFilter));
+  for(const it of its){
+    if(it.type==='transport'){
+      if(it.fromCoord&&it.toCoord){
+        const a=it.fromCoord,b=it.toCoord;
+        const {line}=await drawRoute(m,a,b,it.mode,TYPE_COLOR.transport);line.bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(it.from)+' → '+esc(it.to));
+        [a,b].forEach(p=>{L.marker([p.lat,p.lng],{icon:pinIcon('transport','')}).addTo(m);bounds.push([p.lat,p.lng]);});n++;
+      }else if(it.from||it.to)missing++;
+    }else if(it.coord){
+      L.marker([it.coord.lat,it.coord.lng],{icon:pinIcon(it.type,'')}).addTo(m).bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(fmtShort(it.date))+(it.time?' '+esc(it.time):''));
+      bounds.push([it.coord.lat,it.coord.lng]);n++;
+    }else missing++;
+  }
+  if(bounds.length)m.fitBounds(bounds,{padding:[30,30],maxZoom:14});
+  const st=$('#mapStat');if(st)st.textContent=n+' mapped'+(missing?', '+missing+' not located yet':'');
+}
+async function locateAll(){
+  const its=tripItems();let todo=0;
+  const jobs=[];
+  for(const it of its){
+    if(it.type==='transport'){
+      if(it.from&&!it.fromCoord)jobs.push([it,'from']);if(it.to&&!it.toCoord)jobs.push([it,'to']);
+    }else if(!it.coord)jobs.push([it,'place']);
+  }
+  if(!jobs.length){toast('Everything with a place is already located.');return;}
+  let ok=0;
+  for(let i=0;i<jobs.length;i++){
+    const [it,w]=jobs[i];toast('Finding places… '+(i+1)+' of '+jobs.length);
+    const v=await geocode(geoQ(it,w));
+    if(v){if(w==='from')it.fromCoord=v;else if(w==='to')it.toCoord=v;else it.coord=v;ok++;}
+  }
+  changed();toast('Located '+ok+' of '+jobs.length+' places. Drag pins in an item to fix any that are wrong.');
+  if(view==='map')drawBigMap();
+}
+function renderAll(){
+  ensureSel();renderTripSel();renderViewSeg();
+  if(!trip()){$('#rail').innerHTML='';renderEmpty();}
+  else{
+    renderRail();
+    if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
+    ({day:renderDay,cal:renderCal,agenda:renderAgenda,map:renderMapView}[view]||renderDay)();
+  }
+  $('#foot').textContent='Version '+VERSION;
+}
+function ensureSel(){
+  if(!data.trips.find(t=>t.id===selTrip))selTrip=data.trips.length?data.trips[0].id:null;
+  const t=trip();if(!t){selDate=null;return;}
+  const days=tripDays(t);
+  if(!days.includes(selDate)){const today=toISO(new Date());selDate=days.includes(today)?today:days[0]||null;}
+}
+
+/* ============ ITEM DIALOG ============ */
+let ed=null,edUrls=[],edMap=null,edLayers=[];
+function fld(label,html,cls){return '<label class="f '+(cls||'')+'"><span>'+label+'</span>'+html+'</label>';}
+const inp=(id,v,type,ph)=>'<input id="'+id+'" type="'+(type||'text')+'" value="'+esc(v||'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>';
+function openItem(id,type,date){
+  const orig=id?itemById(id):null;
+  const draft=orig?JSON.parse(JSON.stringify(orig)):Object.assign({id:uid(),trip:selTrip,type,date:date||selDate,endDate:type==='stay'?addDays(date||selDate,1):'',time:'',endTime:'',slot:'',title:'',place:'',address:'',from:'',to:'',mode:type==='transport'?'train':'',meal:'',ref:'',link:'',mapLink:'',notes:'',atts:[],coord:null,fromCoord:null,toCoord:null,src:'manual'},{});
+  ed={orig,draft,isNew:!orig,newAtts:new Set(),removed:[],saved:false,q0:{place:geoQ(draft,'place'),from:geoQ(draft,'from'),to:geoQ(draft,'to')}};
+  const d=draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
+  const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',transport:'Service / description'}[d.type];
+  let f=fld(titleLbl,inp('f_title',d.title));
+  if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else if(d.type==='activity')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld('Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld('Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+
+    '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
+    '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
+    '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
+    '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+
+    '<div class="drop" tabindex="0" data-zone="map" id="dropMap">Paste or drop a map image here (e.g. a screenshot of Google Maps) or <button type="button" class="linkbtn" data-act="pickfile" data-zone="map">choose an image</button></div><div class="atts" id="attsMap"></div></div>'+
+    '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="delitem">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="saveitem">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
+  dlg.onclose=cleanupEd;dlg.showModal();
+  renderAtts();updateGm();setTimeout(()=>mountEdMap(),60);
+}
+function cleanupEd(){
+  edUrls.forEach(u=>URL.revokeObjectURL(u));edUrls=[];
+  if(edMap){edMap.remove();edMap=null;}
+  if(ed&&!ed.saved)ed.newAtts.forEach(id=>idbDel(id));
+  ed=null;
+}
+function gmUrl(d){
+  const mk=safeUrl(d.mapLink);if(mk)return mk;
+  if(d.type==='transport'){const o=[d.from].filter(Boolean).join(),de=[d.to].filter(Boolean).join();if(!o&&!de)return '';return 'https://www.google.com/maps/dir/?api=1&origin='+encodeURIComponent(o)+'&destination='+encodeURIComponent(de)+'&travelmode='+(d.mode==='car'?'driving':d.mode==='walk'?'walking':'transit');}
+  const q=d.address||d.place||d.title;return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):'';
+}
+function readForm(){
+  const d=ed.draft,g=id=>{const e=$('#'+id);return e?e.value.trim():null;};
+  const set=(f,id)=>{const v=g(id);if(v!==null)d[f]=v;};
+  set('title','f_title');set('date','f_date');set('endDate','f_end');set('time','f_time');set('endTime','f_etime');set('address','f_addr');set('place','f_place');set('meal','f_meal');set('mode','f_mode');set('from','f_from');set('to','f_to');set('ref','f_ref');set('link','f_link');set('mapLink','f_maplink');
+  const n=$('#f_notes');if(n)d.notes=n.value;
+  if(d.time)d.slot='';
+}
+function updateGm(){
+  if(!ed)return;readForm();const a=$('#gmLink');if(!a)return;const u=gmUrl(ed.draft);
+  if(u){a.href=u;a.style.display='';}else{a.removeAttribute('href');a.style.display='none';}
+}
+async function renderAtts(){
+  if(!ed)return;
+  for(const zone of ['file','map']){
+    const box=$(zone==='map'?'#attsMap':'#attsFile');if(!box)continue;
+    const list=ed.draft.atts.filter(a=>!!a.map===(zone==='map'));
+    box.innerHTML='';
+    for(const a of list){
+      const div=document.createElement('div');div.className='att';div.dataset.id=a.id;
+      const isImg=/^image\//.test(a.type);
+      div.innerHTML=(isImg?'<img alt="'+esc(a.name)+'" hidden>':'')+'<div class="fn" data-act="openatt" data-id="'+esc(a.id)+'">'+esc(a.name)+'<small>'+fmtSize(a.size||0)+(a.up?' · on OneDrive':' · this device')+'</small></div><button type="button" class="rm" data-act="rmatt" data-id="'+esc(a.id)+'" aria-label="Remove">&times;</button>';
+      box.appendChild(div);
+      if(isImg){attBlob(a).then(b=>{const im=$('img',div);if(b&&im){const u=URL.createObjectURL(b);edUrls.push(u);im.src=u;im.hidden=false;im.dataset.full=u;}else if(im){im.remove();}});}
+    }
+  }
+}
+async function addFiles(files,isMap){
+  if(!ed)return;let n=0;
+  for(const f of files){
+    if(isMap&&!/^image\//.test(f.type)){toast('Map attachments need to be images.');continue;}
+    const a=newAtt(f,isMap);
+    if(!await idbPut(a.id,f)){toast('This browser would not store “'+f.name+'”.');continue;}
+    blobCache.set(a.id,f);ed.draft.atts.push(a);ed.newAtts.add(a.id);n++;
+  }
+  if(n){readForm();renderAtts();toast(n+(n>1?' files':' file')+' added — press Save to keep '+(n>1?'them':'it')+'.');}
+}
+async function mountEdMap(){
+  const el=$('#edMap');if(!el||!ed)return;
+  if(!hasL()){el.innerHTML='<div class="mapnote" style="padding:12px">The map library could not load (offline?).</div>';return;}
+  if(edMap){edMap.remove();edMap=null;}
+  const d=ed.draft,m=edMap=newMap(el);edLayers=[];
+  const pts=[];
+  const mk=(c,which,label)=>{
+    const mm=L.marker([c.lat,c.lng],{draggable:true,icon:pinIcon(d.type,label)}).addTo(m);
+    mm.on('dragend',()=>{const p=mm.getLatLng();const v={lat:p.lat,lng:p.lng};if(which==='from')d.fromCoord=v;else if(which==='to')d.toCoord=v;else d.coord=v;d.coordManual=true;if(d.type==='transport')mountEdMap();});
+    pts.push([c.lat,c.lng]);
+  };
+  if(d.type==='transport'){
+    if(d.fromCoord)mk(d.fromCoord,'from','A');if(d.toCoord)mk(d.toCoord,'to','B');
+    if(d.fromCoord&&d.toCoord){const r=await drawRoute(m,d.fromCoord,d.toCoord,d.mode,TYPE_COLOR.transport);if(!ed||edMap!==m)return;const n=$('#edMapNote');if(n)n.textContent=r.note;}
+  }else if(d.coord)mk(d.coord,'place','');
+  if(pts.length)m.fitBounds(pts,{padding:[30,30],maxZoom:15});
+  setTimeout(()=>{if(edMap===m)m.invalidateSize();},120);
+}
+async function findOnMap(){
+  readForm();const d=ed.draft;const btn=$('[data-act=findmap]');
+  const jobs=d.type==='transport'?[['from',geoQ(d,'from')],['to',geoQ(d,'to')]]:[['place',geoQ(d,'place')]];
+  if(!jobs.some(j=>j[1])){toast(d.type==='transport'?'Enter a From and To first.':'Enter a place, address or title first.');return;}
+  if(btn)btn.disabled=true;let bad=0;
+  for(const [w,q] of jobs){if(!q)continue;const v=await geocode(q);if(!ed)return;if(v){if(w==='from')d.fromCoord=v;else if(w==='to')d.toCoord=v;else d.coord=v;d.coordManual=false;}else bad++;}
+  if(btn)btn.disabled=false;
+  if(bad)toast('Could not find '+(bad>1?'those places':'that place')+'. Try a more specific name, or paste a map link or image.');
+  mountEdMap();
+}
+function saveItem(){
+  readForm();const d=ed.draft;
+  if(!d.title){toast('Please give this item a name.');return;}
+  if(!parseISO(d.date)){toast('Please choose a date.');return;}
+  if(d.type==='stay'){if(!d.endDate||d.endDate<d.date)d.endDate=addDays(d.date,1);}else d.endDate='';
+  const q1={place:geoQ(d,'place'),from:geoQ(d,'from'),to:geoQ(d,'to')};
+  if(!d.coordManual){if(q1.place!==ed.q0.place)d.coord=null;if(q1.from!==ed.q0.from)d.fromCoord=null;if(q1.to!==ed.q0.to)d.toCoord=null;}
+  if(d.type==='transport'&&!d.mode)d.mode='other';
+  delete d.gone;
+  if(ed.isNew)data.items.push(d);else Object.assign(ed.orig,d);
+  ed.saved=true;
+  const rm=ed.removed.slice();
+  const dt=d.date;
+  $('#dlg').close();
+  rm.forEach(removeAttFiles);
+  selDate=dt;changed();renderAll();sweepUploads();
+}
+async function deleteItem(){
+  const c=await askChoice('Delete this item?','“'+ed.orig.title+'” and its notes and attachments will be removed.',['Delete','Keep it']);
+  if(c!==0)return;
+  const it=ed.orig;ed.saved=true;$('#dlg').close();
+  it.atts.forEach(removeAttFiles);data.items=data.items.filter(x=>x.id!==it.id);changed();renderAll();toast('Item deleted.');
+}
+
+/* ============ IMPORT DIALOG ============ */
+let imp=null;
+const FORMAT_HELP='# Japan trip\n\n## Day 1 – Mon 7 Dec 2026: Arrive Tokyo\n- Flight: Brisbane → Tokyo Haneda, depart 10:25, arrive 18:40\n- Train: Haneda Airport → Shinjuku (Keikyu + Metro), 19:30\n- Check-in: Groove Hotel Shinjuku (4 nights)\n- 20:30 Dinner at Omoide Yokocho\n\n## Day 2 – Tue 8 Dec\n### Activities\n- 09:00 Senso-ji Temple, Asakusa\n- 14:00 teamLab Planets\n### Meals\n- Lunch: Ichiran Ramen, Shibuya\n### Transport\n- 08:30 Metro Shinjuku → Asakusa\n\nAlso accepted: tables (Time | Activity | Transport), CSV (date,time,type,title,place,from,to,notes), and JSON exported from this tool.';
+function openImport(){
+  imp={stage:1,parsed:null,plan:null,text:imp&&imp.text||''};
+  const t=trip();
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('map')+'<span>Import itinerary</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db" id="impBody">'+
+    (t?'<label class="f"><span>Where should it go?</span><select id="i_mode"><option value="merge">Update “'+esc(t.name)+'” — keep notes, attachments and maps for items that haven’t changed</option><option value="new">Create a new trip</option></select></label>':'<input type="hidden" id="i_mode" value="new">')+
+    '<div class="grid3" id="i_newrow">'+fld('New trip name','<input id="i_name" placeholder="e.g. Japan Dec 2026">')+fld('Place hint for maps',inp('i_region',t?t.region:'','text','e.g. Japan'))+fld('Day 1 date (if days have no dates)',inp('i_start',t&&t.start||'','date'))+'</div>'+
+    '<label class="f"><span>Paste the itinerary, or choose a file (.txt .md .csv .json)</span><textarea id="i_text" style="min-height:200px" placeholder="Paste your itinerary here…">'+esc(imp.text)+'</textarea></label>'+
+    '<div><input type="file" id="i_file" accept=".txt,.md,.csv,.json,text/*,application/json"> <details style="margin-top:8px"><summary class="hint" style="cursor:pointer">What format works best?</summary><pre class="fmt">'+esc(FORMAT_HELP)+'</pre></details></div></div>'+
+    '<div class="df"><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="impPreview">Preview</button></div></div>';
+  dlg.onclose=null;dlg.showModal();syncImpMode();
+}
+function syncImpMode(){const m=$('#i_mode'),r=$('#i_newrow');if(m&&r)r.style.display=m.value==='new'?'':'none';}
+function runImportPreview(){
+  const mode=$('#i_mode').value,text=$('#i_text').value;imp.text=text;
+  if(!text.trim()){toast('Paste an itinerary or choose a file first.');return;}
+  const t=trip();
+  const start=$('#i_start')&&$('#i_start').value||(mode==='merge'&&t?t.start:'')||'';
+  const parsed=parseAny(text,{start:start||null});
+  imp.parsed=parsed;imp.mode=mode;imp.region=$('#i_region')?$('#i_region').value.trim():'';imp.newName=$('#i_name')?$('#i_name').value.trim():'';
+  imp.tripId=mode==='merge'&&t?t.id:uid();
+  imp.plan=planImport(parsed,mode==='merge'&&t?t.id:'__none__');
+  const p=imp.plan,c=p.count;
+  const byDate={};p.rows.forEach(r=>{(byDate[r.n.date]=byDate[r.n.date]||[]).push(r);});
+  const stText={new:'NEW',upd:'UPDATED',mv:'MOVED',same:'same'};
+  let list=Object.keys(byDate).sort().map(d=>'<h5>'+esc(fmtLong(d))+'</h5>'+byDate[d].map(r=>{
+    const s=!r.m?'new':(r.how==='moved'||r.how==='renamed')?'mv':r.changes.length?'upd':'same';
+    return '<div class="r k-'+r.n.type+'"><span class="st '+s+'">'+stText[s]+'</span><span>'+ico(iconFor(r.n))+' '+(r.n.time?esc(r.n.time)+' ':'')+esc(r.n.title)+(r.n.type==='transport'&&r.n.from&&r.n.to?' <span class="hint">('+esc(r.n.from)+' → '+esc(r.n.to)+')</span>':'')+(r.m&&(hasUserContent(r.m))?' <span class="mini">notes kept</span>':'')+'</span></div>';}).join('')).join('');
+  if(!p.rows.length)list='<div class="hint">Nothing recognised in that text.</div>';
+  const warn=parsed.warnings.map(w=>'<div class="hint" style="color:var(--warn)">⚠ '+esc(w)+'</div>').join('');
+  const miss=p.missing.length?'<div class="blk"><h4>'+p.missing.length+' item'+(p.missing.length>1?'s':'')+' in your trip are not in the new itinerary</h4><div class="hint">'+p.missing.slice(0,8).map(m=>esc(fmtShort(m.date)+' – '+m.title)).join('<br>')+(p.missing.length>8?'<br>…':'')+'</div><label><input type="checkbox" id="i_rm"> Remove them (any with notes, attachments or maps are kept and marked “not in latest import”)</label></div>':'';
+  const canApply=p.rows.length&&!parsed.needsStart;
+  $('#impBody').innerHTML=warn+'<div class="sum"><span class="n">'+c.new+' new</span><span class="u">'+c.upd+' updated</span><span class="m">'+c.mv+' moved / renamed</span><span>'+c.same+' unchanged</span>'+(p.missing.length?'<span class="x">'+p.missing.length+' not in new list</span>':'')+'</div>'+
+    (mode==='merge'?'<div class="hint">Notes, attachments and maps on matched items are always kept. Only fields the new itinerary actually changed are updated.</div>':'')+
+    '<div class="pv">'+list+'</div>'+miss;
+  $('.df',$('#dlg')).innerHTML='<button class="btn l" data-act="impBack">Back</button><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="impApply" '+(canApply?'':'disabled')+'>Apply import</button>';
+}
+function doImport(){
+  const rm=$('#i_rm')&&$('#i_rm').checked;
+  const mode=imp.mode;
+  const t=applyImport(imp.plan,imp.parsed,{tripId:imp.tripId,name:imp.newName,region:imp.region,removeMissing:rm});
+  selTrip=t.id;view='day';const days=tripDays(t);selDate=days[0]||null;
+  $('#dlg').close();changed();renderAll();
+  toast('Itinerary imported. Undo it from Data & sync if needed.');
+  if(mode==='new'&&t.region)toast('Imported. Use Map → Find places on map to pin everything.');
+}
+
+/* ============ TRIP & DATA DIALOGS ============ */
+function openTrip(isNew){
+  const t=isNew?null:trip();
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh"><span>'+(t?'Trip settings':'New trip')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    fld('Trip name',inp('t_name',t?t.name:''))+'<div class="grid2">'+fld('First day',inp('t_start',t?t.start:'','date'))+fld('Last day',inp('t_end',t?t.end:'','date'))+'</div>'+
+    fld('Place hint for map searches',inp('t_region',t?t.region:'','text','e.g. Japan — added to place searches so “Ginza” finds the right one'))+
+    '<div class="hint">Days outside this range appear automatically if you add items on them.</div></div><div class="df">'+
+    (t?'<button class="btn danger l" data-act="deltrip">Delete trip</button><button class="btn" data-act="exporttrip">Export JSON</button>':'')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="savetrip" data-new="'+(t?'':'1')+'">Save</button></div></div>';
+  dlg.onclose=null;dlg.showModal();
+}
+function saveTrip(isNew){
+  const name=$('#t_name').value.trim()||'Trip',start=$('#t_start').value,end=$('#t_end').value,region=$('#t_region').value.trim();
+  if(start&&end&&end<start){toast('The last day is before the first day.');return;}
+  let t=isNew?null:trip();
+  if(!t){t={id:uid(),name,start,end,region,days:{},created:Date.now()};data.trips.push(t);selTrip=t.id;selDate=null;}
+  else{t.name=name;t.start=start;t.end=end;t.region=region;}
+  $('#dlg').close();changed();renderAll();
+}
+function download(name,text,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type||'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+function exportTrip(){
+  const t=trip();if(!t)return;
+  const items=tripItems().map(i=>{const o=Object.assign({},i);delete o.atts;delete o.imp;delete o.trip;delete o.id;return o;});
+  download((t.name||'trip').replace(/[^\w\-]+/g,'_')+'-itinerary.json',JSON.stringify({trip:{name:t.name,region:t.region,days:t.days},items},null,1));
+}
+function openData(){
+  const dlg=$('#dlg'),signed=!!msalAccount;
+  let prev=false;try{prev=!!localStorage.getItem(LS_PREV);}catch(e){}
+  dlg.innerHTML='<div class="dbody"><div class="dh"><span>Data &amp; sync</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    '<div class="blk"><h4>Microsoft / OneDrive</h4><div>'+(signed?'Signed in as <b>'+esc(msalAccount.username||msalAccount.name||'your account')+'</b>. Trips are saved to <code>'+esc(DATA_FILE)+'</code>; screenshots and documents go in the <code>Attachments</code> folder beside it.':(msalConfigured()?'Not signed in — data is kept in this browser only.':'Not set up yet — data is kept in this browser only.'))+'</div>'+
+    '<div class="grid2">'+fld('Azure app client ID for this page',inp('d_cid',(localStorage.getItem(LS_CID)||''),'text',msalConfigured()?'':'Paste the Application (client) ID'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-act="savecid">Save ID</button>'+(signed?'<button class="btn" data-act="signout">Sign out</button>':'<button class="btn primary" data-act="signin">Sign in with Microsoft</button>')+'</div></div></div>'+
+    (framed?'<div class="hint">This page is inside another page. If sign-in is blocked, <a href="'+esc(location.href)+'" target="_blank" rel="noopener">open the full page</a>.</div>':'')+'</div>'+
+    '<div class="blk"><h4>Backup</h4><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-act="exportall">Export everything (JSON)</button><button class="btn" data-act="importall">Restore from backup…</button>'+(prev?'<button class="btn" data-act="undoimport">Undo last itinerary import</button>':'')+'</div><input type="file" id="bk_file" accept=".json,application/json" hidden><div class="hint">Backups hold trips and items, not the attached files (those live on this device and OneDrive).</div></div>'+
+    '<div class="hint">Maps use OpenStreetMap tiles and the free Nominatim search; routes for cars use the public OSRM demo server. Place lookups are rate-limited to about one per second.</div></div><div class="df"><button class="btn primary" data-act="dclose">Done</button></div></div>';
+  dlg.onclose=null;if(!dlg.open)dlg.showModal();
+}
+
+/* ============ EVENTS ============ */
+function go(date){selDate=date;view='day';try{localStorage.setItem(LS_VIEW,view);}catch(e){}renderAll();window.scrollTo({top:0});}
+function pickFiles(zone){
+  const fi=$('#fileIn');if(!fi)return;
+  fi.accept=zone==='map'?'image/*':'*/*';fi.onchange=()=>{addFiles(Array.from(fi.files),zone==='map');fi.value='';};fi.click();
+}
+async function openAtt(id){
+  const a=ed&&ed.draft.atts.find(x=>x.id===id)||data.items.flatMap(i=>i.atts).find(x=>x.id===id);if(!a)return;
+  const b=await attBlob(a);
+  if(!b){toast(msalAccount?'This file is not available yet.':'This file is not on this device. Sign in to fetch it from OneDrive.');return;}
+  const u=URL.createObjectURL(b);
+  if(/^image\//.test(a.type)){$('#lbimg').src=u;$('#lb').showModal();setTimeout(()=>URL.revokeObjectURL(u),60000);return;}
+  if(a.type==='application/pdf'){window.open(u,'_blank');}
+  else{const l=document.createElement('a');l.href=u;l.download=a.name;document.body.appendChild(l);l.click();l.remove();}
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+function onAct(el,e){
+  const act=el.dataset.act;
+  switch(act){
+    case 'import':openImport();break;
+    case 'newtrip':openTrip(true);break;
+    case 'trip':trip()?openTrip(false):openTrip(true);break;
+    case 'data':openData();break;
+    case 'print':window.print();break;
+    case 'addmenu':{
+      if(!trip()){toast('Create or import a trip first.');break;}
+      const m=$('#addMenu');m.innerHTML=TYPES.map(t=>'<button class="k-'+t.id+'" data-act="add" data-type="'+t.id+'">'+ico(t.icon)+t.add+'</button>').join('');m.hidden=!m.hidden;e.stopPropagation();break;}
+    case 'add':$('#addMenu').hidden=true;if(!trip()){toast('Create or import a trip first.');break;}openItem(null,el.dataset.type,selDate);break;
+    case 'open':openItem(el.dataset.id);break;
+    case 'goday':go(el.dataset.date);break;
+    case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
+    case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
+    case 'locate':locateAll();break;
+    case 'dclose':{const d=el.closest('dialog');if(d)d.close();break;}
+    case 'pickfile':pickFiles(el.dataset.zone);break;
+    case 'rmatt':{const id=el.dataset.id,i=ed.draft.atts.findIndex(a=>a.id===id);if(i>=0){const a=ed.draft.atts.splice(i,1)[0];if(ed.newAtts.has(id)){ed.newAtts.delete(id);removeAttFiles(a);}else ed.removed.push(a);readForm();renderAtts();}break;}
+    case 'openatt':openAtt(el.dataset.id);break;
+    case 'findmap':findOnMap();break;
+    case 'saveitem':saveItem();break;
+    case 'delitem':deleteItem();break;
+    case 'impPreview':runImportPreview();break;
+    case 'impBack':openImport();break;
+    case 'impApply':doImport();break;
+    case 'savetrip':saveTrip(el.dataset.new==='1');break;
+    case 'deltrip':{
+      askChoice('Delete this trip?','All its items and notes will be removed from this app. Export first if unsure.',['Delete trip','Keep it']).then(c=>{
+        if(c!==0)return;const t=trip();data.items.filter(i=>i.trip===t.id).forEach(i=>i.atts.forEach(removeAttFiles));
+        data.items=data.items.filter(i=>i.trip!==t.id);data.trips=data.trips.filter(x=>x.id!==t.id);$('#dlg').close();changed();renderAll();});break;}
+    case 'exporttrip':exportTrip();break;
+    case 'savecid':{const v=$('#d_cid').value.trim();try{if(v)localStorage.setItem(LS_CID,v);else localStorage.removeItem(LS_CID);}catch(e){}toast('Saved. Reload the page, then sign in.');break;}
+    case 'signin':signIn();break;
+    case 'signout':signOut();break;
+    case 'exportall':download('travel-backup-'+toISO(new Date())+'.json',JSON.stringify(data,null,1));break;
+    case 'importall':$('#bk_file').click();break;
+    case 'undoimport':{
+      askChoice('Undo the last import?','Trips and items go back to how they were just before the last itinerary import.',['Undo import','Cancel']).then(c=>{
+        if(c!==0)return;try{data=normalise(JSON.parse(localStorage.getItem(LS_PREV)));localStorage.removeItem(LS_PREV);}catch(e){toast('Nothing to undo.');return;}
+        ensureSel();changed();renderAll();openData();toast('Import undone.');});break;}
+  }
+}
+document.addEventListener('click',e=>{
+  const img=e.target.closest('.att img');if(img&&img.dataset.full){$('#lbimg').src=img.dataset.full;$('#lb').showModal();return;}
+  const el=e.target.closest('[data-act]');
+  if(!el){const m=$('#addMenu');if(m&&!m.hidden&&!e.target.closest('.menuwrap'))m.hidden=true;return;}
+  if(el.tagName==='A')return;
+  onAct(el,e);
+});
+document.addEventListener('keydown',e=>{
+  if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('card')){e.preventDefault();onAct(e.target,e);}
+});
+$('#lbx').onclick=()=>$('#lb').close();
+$('#lb').addEventListener('click',e=>{if(e.target.id==='lb')$('#lb').close();});
+$('#tripSel').onchange=e=>{selTrip=e.target.value;selDate=null;try{localStorage.setItem(LS_SEL,selTrip);}catch(x){}renderAll();};
+$('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(!b)return;view=b.dataset.view;try{localStorage.setItem(LS_VIEW,view);}catch(x){}renderAll();});
+document.addEventListener('change',e=>{
+  const t=e.target;
+  if(t.id==='i_mode')syncImpMode();
+  if(t.id==='i_file'&&t.files[0]){
+    const f=t.files[0];const rd=new FileReader();
+    rd.onload=()=>{$('#i_text').value=String(rd.result);const n=$('#i_name');if(n&&!n.value)n.value=f.name.replace(/\.[^.]+$/,'');};rd.readAsText(f);
+  }
+  if(t.id==='bk_file'&&t.files[0]){
+    const rd=new FileReader();
+    rd.onload=async()=>{
+      try{const o=normalise(JSON.parse(String(rd.result)));if(!o.trips.length)throw new Error('No trips in that file');
+        const c=await askChoice('Restore this backup?','This replaces the trips and items currently in the app ('+o.trips.length+' trip'+(o.trips.length>1?'s':'')+' in the file).',['Restore','Cancel']);
+        if(c!==0)return;try{localStorage.setItem(LS_PREV,JSON.stringify(data));}catch(x){}
+        data=o;ensureSel();changed();renderAll();openData();toast('Backup restored.');
+      }catch(err){toast('That file is not a valid backup: '+err.message);}
+    };rd.readAsText(t.files[0]);t.value='';
+  }
+  if(t.id==='dayTitle'||t.id==='dayNotes'){
+    const tr=trip();if(!tr||!selDate)return;const dd=tr.days[selDate]||(tr.days[selDate]={title:'',notes:''});
+    if(t.id==='dayTitle')dd.title=t.value.trim();else dd.notes=t.value;changed();renderRail();
+  }
+});
+document.addEventListener('input',e=>{if(ed&&e.target.closest('#dlg'))updateGm();});
+/* paste & drop of screenshots/files into the item dialog */
+function zoneOf(t){const z=t&&t.closest&&t.closest('[data-zone]');return z?z.dataset.zone:'file';}
+document.addEventListener('paste',e=>{
+  if(!ed||!e.target.closest('#dlg'))return;
+  const files=Array.from(e.clipboardData&&e.clipboardData.files||[]);
+  if(!files.length)return;
+  e.preventDefault();addFiles(files,zoneOf(e.target)==='map');
+});
+document.addEventListener('dragover',e=>{const z=e.target.closest&&e.target.closest('.drop');if(z&&ed){e.preventDefault();z.classList.add('over');}});
+document.addEventListener('dragleave',e=>{const z=e.target.closest&&e.target.closest('.drop');if(z)z.classList.remove('over');});
+document.addEventListener('drop',e=>{
+  const z=e.target.closest&&e.target.closest('.drop');if(!z||!ed)return;
+  e.preventDefault();z.classList.remove('over');addFiles(Array.from(e.dataTransfer.files),z.dataset.zone==='map');
+});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&msalAccount&&!ed)syncFromOneDrive();});
+
+/* ============ START ============ */
+window.__travel={parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
+(async function init(){
+  try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
+  try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
+  try{selTrip=localStorage.getItem(LS_SEL);view=localStorage.getItem(LS_VIEW)||'day';}catch(e){}
+  if(!['day','cal','agenda','map'].includes(view))view='day';
+  renderAll();setStatus('local');
+  if(msalConfigured()&&window.msal){
+    try{
+      msalApp=new msal.PublicClientApplication({auth:{clientId:clientId(),authority:'https://login.microsoftonline.com/consumers',redirectUri:window.location.origin+window.location.pathname,navigateToLoginRequestUrl:false},cache:{cacheLocation:'localStorage'}});
+      await msalApp.initialize();
+      await msalApp.handleRedirectPromise().catch(()=>{});
+      try{[localStorage,sessionStorage].forEach(st=>Object.keys(st).filter(k=>/interaction\.status$/.test(k)&&(k.includes(clientId())||!/[0-9a-f]{8}-[0-9a-f]{4}/.test(k))).forEach(k=>st.removeItem(k)));}catch(e){}
+      const accts=msalApp.getAllAccounts();
+      if(accts.length){msalAccount=accts[0];await syncFromOneDrive();}
+    }catch(e){console.error(e);setStatus('local');}
+  }
+})();
+})();
+</script>
+</body>
+</html>
