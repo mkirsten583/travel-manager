@@ -1095,7 +1095,7 @@ function parseAny(text,opts){
 }
 
 /* ============ MERGE ============ */
-const keyOf=i=>i.type+'|'+i.date+'|'+norm(i.title);
+const keyOf=i=>(i.impType||i.type)+'|'+i.date+'|'+norm(i.title);
 function dice(a,b){a=norm(a).replace(/ /g,'');b=norm(b).replace(/ /g,'');if(a.length<2||b.length<2)return 0;const bg=s=>{const m=new Map();for(let i=0;i<s.length-1;i++){const g=s.slice(i,i+2);m.set(g,(m.get(g)||0)+1);}return m;};const A=bg(a),B=bg(b);let n=0;A.forEach((v,k)=>{if(B.has(k))n+=Math.min(v,B.get(k));});return 2*n/(a.length+b.length-2);}
 function jac(a,b){const A=new Set(norm(a).split(' ').filter(Boolean)),B=new Set(norm(b).split(' ').filter(Boolean));if(!A.size||!B.size)return 0;let n=0;A.forEach(x=>{if(B.has(x))n++;});return n/(A.size+B.size-n);}
 const snap=n=>{const o={};for(const f of IMPORT_FIELDS)o[f]=n[f]||'';return o;};
@@ -1108,13 +1108,13 @@ function planImport(parsed,tripId){
   parsed.items.forEach(n=>{const a=idx.get(keyOf(n));const m=a&&a.find(x=>!used.has(x.id));if(m){used.add(m.id);rows.push({n,m,how:'exact'});}else pending.push(n);});
   const p2=[];
   pending.forEach(n=>{
-    const cand=existing.filter(x=>!used.has(x.id)&&x.type===n.type&&norm(x.title)===norm(n.title));
+    const cand=existing.filter(x=>!used.has(x.id)&&(x.impType||x.type)===n.type&&norm(x.title)===norm(n.title));
     const same=pending.filter(q=>q.type===n.type&&norm(q.title)===norm(n.title)).length;
     if(cand.length===1&&same===1){used.add(cand[0].id);rows.push({n,m:cand[0],how:'moved'});}else p2.push(n);
   });
   const p3=[];
   p2.forEach(n=>{
-    let best=null,bs=0;existing.forEach(x=>{if(used.has(x.id)||x.type!==n.type||x.date!==n.date)return;const s=Math.max(jac(n.title,x.title),dice(n.title,x.title)-.2);if(s>bs){bs=s;best=x;}});
+    let best=null,bs=0;existing.forEach(x=>{if(used.has(x.id)||(x.impType||x.type)!==n.type||x.date!==n.date)return;const s=Math.max(jac(n.title,x.title),dice(n.title,x.title)-.2);if(s>bs){bs=s;best=x;}});
     if(best&&bs>=.5){used.add(best.id);rows.push({n,m:best,how:'renamed'});}else p3.push(n);
   });
   p3.forEach(n=>rows.push({n,m:null,how:'new'}));
@@ -1229,7 +1229,8 @@ const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2
 function pinIcon(type,label){return L.divIcon({className:'',html:'<div class="pin k-'+type+'">'+esc(label||'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
 function newMap(el){
   const m=L.map(el,{scrollWheelZoom:true});
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(m);
+  const esri=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, OpenStreetMap contributors'}).addTo(m);
+  let bad=0;esri.on('tileerror',()=>{if(++bad===6){m.removeLayer(esri);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(m);}});
   m.setView([20,0],2);return m;
 }
 
@@ -1393,9 +1394,13 @@ function openItem(id,type,date){
   const orig=id?itemById(id):null;
   const draft=orig?JSON.parse(JSON.stringify(orig)):Object.assign({id:uid(),trip:selTrip,type,date:date||selDate,endDate:type==='stay'?addDays(date||selDate,1):'',time:'',endTime:'',slot:'',title:'',place:'',address:'',from:'',to:'',mode:type==='transport'?'train':'',meal:'',ref:'',link:'',mapLink:'',notes:'',atts:[],coord:null,fromCoord:null,toCoord:null,src:'manual',bk:'',price:'',how:'',svc:'',bkNote:''},{});
   ed={orig,draft,isNew:!orig,newAtts:new Set(),removed:[],saved:false,q0:{place:geoQ(draft,'place'),from:geoQ(draft,'from'),to:geoQ(draft,'to')}};
-  const d=draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
+  renderItemDialog(true);
+}
+function renderItemDialog(first){
+  if(edMap){edMap.remove();edMap=null;}
+  const d=ed.draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
   const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',transport:'Service / description'}[d.type];
-  let f=fld(titleLbl,inp('f_title',d.title));
+  let f=fld('Type','<select id="f_type">'+TYPES.map(x=>'<option value="'+x.id+'"'+(x.id===d.type?' selected':'')+'>'+x.label+'</option>').join('')+'</select>')+fld(titleLbl,inp('f_title',d.title));
   if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='activity')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld('Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
@@ -1409,8 +1414,21 @@ function openItem(id,type,date){
     '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+
     '<div class="drop" tabindex="0" data-zone="map" id="dropMap">Paste or drop a map image here (e.g. a screenshot of Google Maps) or <button type="button" class="linkbtn" data-act="pickfile" data-zone="map">choose an image</button></div><div class="atts" id="attsMap"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="delitem">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="saveitem">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
-  dlg.onclose=cleanupEd;dlg.showModal();
+  if(first){dlg.onclose=cleanupEd;dlg.showModal();}
   renderAtts();updateGm();setTimeout(()=>mountEdMap(),60);
+}
+function changeType(nt){
+  if(!ed||!TYPE_BY_ID[nt]||ed.draft.type===nt)return;
+  readForm();const d=ed.draft,was=d.type;
+  if(ed.orig&&!d.impType&&ed.orig.src==='import')d.impType=ed.orig.impType||was;
+  if(d.impType===nt)delete d.impType;
+  d.type=nt;
+  if(nt==='stay'){if(!d.endDate||d.endDate<=d.date)d.endDate=addDays(d.date,1);}else d.endDate='';
+  if(nt==='transport'&&!d.mode)d.mode='train';
+  if(nt!=='transport'&&d.mode&&!ed.orig)d.mode='';
+  if(nt==='food'&&!d.meal){const m=(d.title+' '+d.time).match(/breakfast|brunch|lunch|dinner|supper/i);d.meal=m?(/brunch/i.test(m[0])?'lunch':/supper/i.test(m[0])?'dinner':m[0].toLowerCase()):'';}
+  if(nt!=='food')d.meal=d.meal||'';
+  renderItemDialog(false);
 }
 function cleanupEd(){
   edUrls.forEach(u=>URL.revokeObjectURL(u));edUrls=[];
@@ -1598,10 +1616,11 @@ function openData(){
   dlg.onclose=null;if(!dlg.open)dlg.showModal();
 }
 /* ============ REPORTS: accommodation, meals, transport (with bookings) ============ */
-let repTab='stay',repAll=false;
+let repTab='stay',repAll=false,repMeal='',repMode='';
 const BK_SHORT={confirmed:'Booked',tobook:'To book',optional:'Recommended',included:'Included',none:'No booking'};
 const bkTag=it=>(it.bk&&it.bk!=='none')?'<span class="bk bk-'+it.bk+'">'+BK_SHORT[it.bk]+'</span>':'';
 const isBookable=i=>['confirmed','tobook','optional','included'].includes(i.bk)||(i.type==='transport'&&i.mode==='flight');
+const BK_MEAL=k=>(MEALS.find(m=>m[0]===k)||[])[1]||k;
 const modeLabel=m=>(MODES.find(x=>x[0]===m)||[])[1]||'';
 const when=(d,t)=>fmtShort(d)+(t?' '+t:'');
 const trunc=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n-1)+'…':s;};
@@ -1619,6 +1638,8 @@ const REP={
 function repItems(tab){
   let its=tripItems().filter(i=>i.type===tab);
   if(tab!=='stay'&&!repAll)its=its.filter(isBookable);
+  if(tab==='food'&&repMeal)its=its.filter(i=>i.meal===repMeal);
+  if(tab==='transport'&&repMode)its=its.filter(i=>(i.mode||'other')===repMode);
   return its.sort((a,b)=>(a.date+(tab==='stay'?'':sortKey(a))).localeCompare(b.date+(tab==='stay'?'':sortKey(b))));
 }
 function priceTotals(its){
@@ -1651,12 +1672,14 @@ function renderReports(){
   const chips='<span class="bk bk-confirmed">'+cnt('confirmed')+' booked</span><span class="bk bk-tobook">'+cnt('tobook')+' to book</span><span class="bk bk-optional">'+cnt('optional')+' recommended</span><span class="bk bk-included">'+cnt('included')+' included</span>'+(repTab==='stay'?'<span class="bk">'+nights+' nights</span>':'');
   const pc=priceTotals(its.filter(i=>i.bk==='confirmed')),pa=priceTotals(its);
   let h='<div class="rep"><div class="rep-bar nop"><div class="seg" id="repSeg">'+tabs+'</div><span class="sp"></span>'+
+    (repTab==='food'?'<label class="chk">Meal <select id="rep_meal">'+[['','All meals']].concat(MEALS.filter(m=>m[0])).map(m=>'<option value="'+m[0]+'"'+(m[0]===repMeal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>':'')+
+    (repTab==='transport'?'<label class="chk">Type <select id="rep_mode">'+[['','All types']].concat(MODES).map(m=>'<option value="'+m[0]+'"'+(m[0]===repMode?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>':'')+
     (repTab!=='stay'?'<label class="chk"><input type="checkbox" id="rep_all" '+(repAll?'checked':'')+'> Show everything, not just bookings</label>':'')+
     '<button class="btn" data-act="repcsv">Download CSV</button><button class="btn" data-act="repprint">Print</button></div>'+
-    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+'</h2><div class="rep-chips">'+chips+'</div>'+
+    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+(repTab==='food'&&repMeal?' — '+esc(BK_MEAL(repMeal)):'')+(repTab==='transport'&&repMode?' — '+esc(modeLabel(repMode)):'')+'</h2><div class="rep-chips">'+chips+'</div>'+
     (pa?'<div class="hint">Listed prices (first figure on each line; “pp” means per person): '+(pc?'<b>booked '+esc(pc)+'</b> · ':'')+'all listed '+esc(pa)+'</div>':'')+
     (gaps.length?'<div class="hint" style="color:var(--warn)">⚠ No accommodation for the night of '+gaps.map(d=>esc(fmtShort(d))).join(', ')+'</div>':'')+'</div>';
-  if(!its.length)h+='<div class="empty"><p>Nothing to show here yet.'+(repTab!=='stay'&&!repAll?' Tick “Show everything” to list every '+(repTab==='food'?'meal':'journey')+', or open an item and set its booking status.':'')+'</p></div>';
+  if(!its.length)h+='<div class="empty"><p>Nothing to show here yet.'+(repTab!=='stay'&&!repAll?' Tick “Show everything” or change the filter to list every '+(repTab==='food'?'meal':'journey')+', or open an item and set its booking status.':'')+'</p></div>';
   else h+='<div class="rep-wrap"><table class="rep-t"><thead><tr>'+R.cols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr></thead><tbody>'+its.map(i=>'<tr class="k-'+i.type+'" data-act="open" data-id="'+esc(i.id)+'" tabindex="0">'+R.cols.map(c=>{
     const v=c[1](i)||'';
     if(c[0]==='Status')return '<td>'+(i.bk?'<span class="bk bk-'+i.bk+'">'+esc(v)+'</span>':'<span class="hint">—</span>')+'</td>';
@@ -1751,6 +1774,9 @@ $('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
+  if(t.id==='f_type'){changeType(t.value);return;}
+  if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
+  if(t.id==='rep_mode'){repMode=t.value;renderAll();}
   if(t.id==='rep_all'){repAll=t.checked;renderAll();}
   if(t.id==='i_file'&&t.files[0]){
     const f=t.files[0];
