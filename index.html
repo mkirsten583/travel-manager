@@ -169,6 +169,23 @@ pre.fmt{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
   .layout{display:block}
   .sec,.agday,.dayhead{break-inside:avoid;border-color:#bbb}
 }
+
+.bk{display:inline-block;font-size:11px;font-weight:650;padding:0 8px;border-radius:999px;border:1px solid var(--line);margin-left:6px;color:var(--ink);white-space:nowrap}
+.rep-head .bk,.rep-bar .bk{margin-left:0;margin-right:6px}
+.bk-confirmed{background:#2e7d4f33;border-color:#2e7d4f88}.bk-tobook{background:#b3261e2e;border-color:#b3261e88}.bk-optional{background:#b26a0030;border-color:#b26a0088}.bk-included{background:#2b6cb030;border-color:#2b6cb088}
+.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
+.rep-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.rep-bar .sp{flex:1}.chk{font-size:13px;display:flex;gap:5px;align-items:center}
+.rep-bar .seg button .n{font-size:11px;opacity:.7;margin-left:3px}
+.rep-head h2{margin:0 0 6px;font-size:19px}.rep-chips{margin:4px 0 6px}
+.rep-wrap{overflow:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface);margin-top:8px}
+.rep-t{border-collapse:collapse;width:100%;font-size:13px}
+.rep-t th{position:sticky;top:0;background:var(--surface);text-align:left;font-size:12px;color:var(--muted);padding:7px 9px;border-bottom:2px solid var(--line);white-space:nowrap}
+.rep-t td{padding:6px 9px;border-bottom:1px solid var(--line);vertical-align:top;min-width:56px}
+.rep-t td.strong{font-weight:650;min-width:150px}
+.rep-t tbody tr{cursor:pointer}.rep-t tbody tr:hover{background:#8881}
+.rep-un{margin-top:14px;font-size:13px}.rep-un h4{margin:0 0 4px}.rep-un li{margin:2px 0}
+@media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -179,7 +196,7 @@ pre.fmt{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
     <h1>Travel manager</h1>
     <select id="tripSel" aria-label="Trip"></select>
     <div class="seg" id="viewSeg">
-      <button data-view="day">Day</button><button data-view="cal">Calendar</button><button data-view="agenda">Agenda</button><button data-view="map">Map</button>
+      <button data-view="day">Day</button><button data-view="cal">Calendar</button><button data-view="agenda">Agenda</button><button data-view="map">Map</button><button data-view="reports">Reports</button>
     </div>
     <span class="sp"></span>
     <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
@@ -206,7 +223,7 @@ pre.fmt{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-10-27 · travel manager v1';
+const VERSION = '2026-10-27 · travel manager v2';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -220,7 +237,7 @@ const TYPES=[
 const TYPE_BY_ID=Object.fromEntries(TYPES.map(t=>[t.id,t]));
 const MODES=[['train','Train / metro'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
 const MEALS=[['','—'],['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack / drink']];
-const IMPORT_FIELDS=['title','date','endDate','time','endTime','slot','place','from','to','mode','meal'];
+const IMPORT_FIELDS=['title','date','endDate','time','endTime','slot','place','from','to','mode','meal','bk','ref','price','how','svc','bkNote'];
 const ICONS={
   bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
   food:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
@@ -273,7 +290,7 @@ function normalise(o){
   o=(o&&typeof o==='object')?o:{};
   const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
   for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';}
-  for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';}
+  for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
   return d;
 }
 const trip=()=>data.trips.find(t=>t.id===selTrip)||null;
@@ -579,7 +596,7 @@ function splitTitle(t){
   if(title.length>90){notes=(title+(notes?'\n'+notes:'')).trim();title=title.slice(0,85).replace(/\s+\S*$/,'')+'…';}
   return {title:title.replace(/[\s,;:\-–—]+$/,'').trim(),notes};
 }
-function blankItem(){return {type:'activity',date:'',endDate:'',time:'',endTime:'',slot:'',title:'',place:'',from:'',to:'',mode:'',meal:'',notes:''};}
+function blankItem(){return {type:'activity',date:'',endDate:'',time:'',endTime:'',slot:'',title:'',place:'',from:'',to:'',mode:'',meal:'',notes:'',bk:'',ref:'',price:'',how:'',svc:'',bkNote:''};}
 const sim=(a,b)=>{const x=norm(a),y=norm(b);if(!x||!y)return 0;return Math.max(jac(a,b),(x.includes(y)||y.includes(x))?.7:0);};
 const GENERIC=new Set('the a at into of check in out drop bags bag luggage travel to hotel and early permitting otherwise store'.split(' '));
 const sharedTokens=(a,b)=>{const A=norm(a).split(' ').filter(w=>w.length>2&&!GENERIC.has(w)),B=new Set(norm(b).split(' '));return A.filter(w=>B.has(w)).length;};
@@ -827,9 +844,212 @@ function parseItinerary(text,opts){
   res.items=res.items.filter(i=>!rm.has(i));
   res.items.forEach(i=>{delete i._day;delete i._out;delete i._nights;});
   res.days=dayObjs.filter(d=>d.date).map(d=>({date:d.date,title:d.title,notes:d.notes}));
+  enrichBookings(res,text);
   return res;
 }
+/* ---------- bookings: status / reference / price from itinerary text and summary tables ---------- */
+const BK_STATUS=[['','—'],['confirmed','Booked / confirmed'],['tobook','To book'],['optional','Recommended'],['included','Included (room / tour)'],['none','No booking needed']];
+const BK_LABEL=Object.fromEntries(BK_STATUS);
+const CUR='(?:A\\$|AU\\$|AUD\\s?|US\\$|\\$|¥|JPY\\s?|£|€)';
+function priceFrom(s){
+  const m=String(s||'').match(new RegExp('~?'+CUR+'\\s?\\d[\\d,]*(?:\\.\\d+)?(?:\\s?[–-]\\s?\\d[\\d,]*(?:\\.\\d+)?)?(?:\\s*(?:total|pp|per person))?','i'));
+  return m?m[0].trim():'';
+}
+function refFrom(s){
+  const m=String(s||'').match(/\b(?:res(?:ervation)?\.?\s*(?:no\.?|number|#)|ref(?:erence)?\.?\s*(?:no\.?|#)?|conf(?:irmation)?\.?\s*(?:no\.?|number|#|code)?|booking\s*(?:ref(?:erence)?|no\.?|number|#|id))\s*[:#]?\s*((?=[A-Z0-9\-]*\d)[A-Z0-9][A-Z0-9\-]{3,})/i);
+  return m?m[1]:'';
+}
+function statusFrom(s){
+  s=String(s||'');
+  if(/included with your room|bundled into|confirmed at time of room booking|included in (?:the )?(?:room|stay|tour)/i.test(s))return 'included';
+  if(/not\s+(?:yet\s+)?confirmed|un-?confirmed|(?:to be|needs?|needing|timing|until|get(?:ting)?)\s+confirmed|confirm (?:the|price|with|train|exact)/i.test(s)&&!/✅/.test(s))return '';
+  if(/✅|\bconfirmed\b|payment received|\bbooked\b(?!\s+ahead)/i.test(s))return 'confirmed';
+  if(/mandatory|all[- ]reserved|must book|book ahead|still to book|reservation required|^\s*yes\b/i.test(s))return 'tobook';
+  if(/recommended|advisable/i.test(s))return 'optional';
+  if(/not needed|no reservation|walk-in|no booking/i.test(s))return 'none';
+  return '';
+}
+function parsePipeTables(text){
+  const L=String(text).split('\n'),out=[];
+  for(let i=0;i<L.length;i++){
+    if(!/^\s*\|/.test(L[i]))continue;
+    const blk=[];while(i<L.length&&/^\s*\|/.test(L[i])){blk.push(L[i]);i++;}i--;
+    if(blk.length<3||!/^\s*\|?\s*:?-{2,}/.test(blk[1].replace(/^\s*\|/,'')))continue;
+    const cells=l=>l.trim().replace(/^\||\|$/g,'').split('|').map(c=>c.replace(/\*\*/g,'').trim());
+    out.push({head:cells(blk[0]).map(h=>h.toLowerCase()),rows:blk.slice(2).map(cells)});
+  }
+  return out;
+}
+const cellOf=(t,row,re)=>{const i=t.head.findIndex(h=>re.test(h));return i>=0?(row[i]||''):'';};
+const BK_STOP=new Set('dinner lunch breakfast house course tasting menu special tour local guide full with year end new matcha soba backup'.split(' '));
+function enrichBookings(res,text){
+  res.unmatched={legs:[],rests:[]};
+  /* 1. inline statements on the day lines (✅ CONFIRMED, Res #…, A$…) */
+  res.items.forEach(it=>{
+    const s=it.title+' '+(it.notes||'');
+    const st=statusFrom(s);
+    if(st==='confirmed'||st==='included'){
+      it.bk=st;const r=refFrom(s);if(r)it.ref=r;
+      if(st==='confirmed'){const p=priceFrom(s);if(p&&!it.price)it.price=p;}
+    }
+  });
+  const tabs=parsePipeTables(text);
+  const dateOfDay=n=>{const d=res.days[n-1];return d?d.date:'';};
+  /* 2. accommodation summary: city for each stay */
+  tabs.filter(t=>t.head.includes('nights')&&t.head.some(h=>/hotel/.test(h))).forEach(t=>t.rows.forEach(r=>{
+    const city=cellOf(t,r,/city/),hotel=cellOf(t,r,/hotel/);
+    res.items.filter(i=>i.type==='stay'&&sim(i.title,hotel)>=.6).forEach(i=>{if(city&&(!i.place||norm(i.place)===norm(i.title)))i.place=city;});
+  }));
+  /* 3. restaurants & experiences needing booking */
+  tabs.filter(t=>t.head.some(h=>/^restaurant/.test(h))).forEach(t=>t.rows.forEach(r=>{
+    const name=cellOf(t,r,/^restaurant/),win=cellOf(t,r,/booking/),how=cellOf(t,r,/how to book/),loc=cellOf(t,r,/location/);
+    if(!name)return;
+    const dn=parseInt((cellOf(t,r,/day/).match(/\d+/)||[])[0],10);
+    let date=dn?dateOfDay(dn):'';
+    if(!date){const fd=findDate(cellOf(t,r,/^date/),res.days[0]&&res.days[0].date);if(fd)date=fd.iso;}
+    const short=name.replace(/\s+[—–-]\s+.*$/,'').replace(/\s*,.*$/,'').trim();
+    const cand=res.items.filter(i=>(!date||i.date===date)&&(i.type==='food'||i.type==='activity'));
+    let best=null,bs=0;
+    cand.forEach(i=>{
+      const toks=norm(short).split(' ').filter(w=>w.length>2&&!BK_STOP.has(w)),hay=norm(i.title+' '+i.place);
+      const sc=toks.filter(w=>hay.includes(w)).length+(i.type==='food'?.5:0);
+      if(sc>bs&&toks.some(w=>hay.includes(w))){bs=sc;best=i;}
+    });
+    if(!best){const ml=(name.match(/\b(breakfast|lunch|dinner)\b/i)||[])[1];if(ml){const c=cand.filter(i=>i.type==='food'&&i.meal===ml.toLowerCase());if(c.length===1)best=c[0];}}
+    if(!best){res.unmatched.rests.push({name,date,win,how,loc});return;}
+    const both=win+' '+how;
+    best.bk=statusFrom(win)||statusFrom(how)||'';
+    const rf=refFrom(both);if(rf)best.ref=rf;
+    const pr=priceFrom(both);if(pr&&/total|pp|\$|¥/.test(pr))best.price=pr;
+    best.how=how;best.bkNote=win;
+    if(!best.place&&loc)best.place=short+(loc?', '+loc:'');
+  }));
+  /* 4. train / bus legs: price, reservation, how to book */
+  const key=s=>norm(String(s).replace(/[\u{1F300}-\u{1FAFF}✈]/gu,'')).replace(/\b(station|airport|hotel|the)\b/g,'').trim();
+  const tok1=s=>(key(s).split(' ').filter(w=>w.length>2)[0])||'';
+  const usedT=new Set();
+  tabs.filter(t=>t.head.some(h=>/^leg/.test(h))).forEach(t=>t.rows.forEach(r=>{
+    const leg=cellOf(t,r,/^leg/).replace(/^[^A-Za-z]+/,'').trim(),mode=cellOf(t,r,/mode/),price=cellOf(t,r,/price/),rsv=cellOf(t,r,/reserv/),how=cellOf(t,r,/how to book/);
+    const pp=leg.split(/\s*(?:→|->|—>|\bto\b)\s*/i);if(pp.length<2)return;
+    const f=tok1(pp[0]),to=tok1(pp[pp.length-1]);if(!f||!to)return;
+    const cand=res.items.filter(i=>i.type==='transport'&&i.from&&i.to&&!usedT.has(i)&&key(i.from).includes(f)&&key(i.to).includes(to));
+    const it=cand.find(i=>i.mode!=='walk')||cand[0];
+    if(!it){
+      const A=res.items.find(i=>i.type==='transport'&&i.from&&!usedT.has(i)&&key(i.from).includes(f)&&i.mode!=='walk');
+      const B=A&&res.items.find(i=>i.type==='transport'&&i.to&&i!==A&&i.date===A.date&&!usedT.has(i)&&key(i.to).includes(to)&&i.mode!=='walk');
+      if(A&&B){[A,B].forEach(x=>{usedT.add(x);x.bk=statusFrom(rsv);x.svc=mode;x.how=how;x.bkNote=rsv+(x===B?' — booked together with the leg before':'');});A.price=price;return;}
+      res.unmatched.legs.push({leg,mode,price,rsv,how});return;}
+    usedT.add(it);
+    if(it.bk!=='confirmed'){it.bk=statusFrom(rsv);}
+    it.svc=mode;it.price=price;it.how=how;it.bkNote=rsv;
+  }));
+  /* arrival / landing markers are things you do, not journeys */
+  res.items.forEach(i=>{if(i.type==='transport'&&!i.from&&!i.to&&/^(arrive|land)\b/i.test(i.title)){i.type='activity';i.mode='';}});
+  res.items.forEach(i=>{['bk','ref','price','how','svc','bkNote'].forEach(f=>{if(i[f]==null)i[f]='';});});
+  return res;
+}
+/* ---------- PDF → markdown (Time/Item/Comments day tables + summary tables) ---------- */
+const PDF_ICONS={'\x01':'🚆','\x02':'🚇','\x03':'🚌','\x04':'🚕','\x05':'🚶'};
+function pdfItemsToMarkdown(pages){
+  const out=[];let mode=null,cols=null,row=null,headOpen=false,lastPageIdx=-1,prevY=null,prevH=6,firstLineOfPage=false;
+  const clean=s=>s.replace(/[\x01-\x05]/g,c=>PDF_ICONS[c]).replace(/ /g,' ');
+  const joinWords=arr=>{let s='';arr.forEach(it=>{const t=clean(it.s);if(!s){s=t;return}const gap=it.x-it.prevEnd;s+=(gap>0.8?' ':'')+t});return s.replace(/\s+/g,' ').trim()};
+  const addTxt=(a,b)=>!a?b:!b?a:(/\S-$/.test(a))?a+b:a+' '+b;
+  function groupLines(items){
+    const its=items.filter(i=>i.s.trim()!=='').map(i=>({s:i.s,x:i.x,y:i.y,w:i.w,h:i.h,prevEnd:0}));
+    its.sort((a,b)=>b.y-a.y||a.x-b.x);
+    const lines=[];
+    its.forEach(it=>{const L=lines[lines.length-1];if(L&&Math.abs(L.y-it.y)<2.2){L.items.push(it)}else lines.push({y:it.y,h:it.h,items:[it]})});
+    lines.forEach(L=>{L.items.sort((a,b)=>a.x-b.x);let pe=null;L.items.forEach(it=>{it.prevEnd=pe===null?it.x:pe;pe=it.x+it.w});L.h=Math.max(...L.items.map(i=>i.h));L.x0=L.items[0].x;L.text=joinWords(L.items)});
+    return lines;
+  }
+  function cellsOf(L,gap){const cs=[];L.items.forEach(it=>{const c=cs[cs.length-1];if(c&&it.x-c.end<=gap){c.items.push(it);c.end=it.x+it.w}else cs.push({x:it.x,end:it.x+it.w,items:[it]})});cs.forEach(c=>c.text=joinWords(c.items));return cs}
+  function assign(L){const r=cols.map(()=>'');
+    const groups=cols.map(()=>[]);
+    L.items.forEach(it=>{let k=0;for(let i=0;i<cols.length;i++){if(it.x>=cols[i]-3)k=i}groups[k].push(it)});
+    groups.forEach((g,i)=>{if(g.length){g.forEach((it,j)=>{it.prevEnd=j?g[j-1].x+g[j-1].w:it.x});r[i]=joinWords(g)}});
+    return r}
+  function flush(){
+    if(!row)return;
+    if(row.kind==='day'){
+      let [t,item,com]=row.c;const est=/\*/.test(t);t=t.replace(/\*/g,'').replace(/\s+/g,'');
+      const tt=t?(est?'~':'')+t.replace(/^(~?)(\d{1,2}:\d{2})[–-](\d{1,2}:\d{2})$/,'$1$2–$3'):'';
+      out.push('- '+tt+(tt?' — ':'')+item+(com?' — '+com:''));
+    }else out.push('| '+row.c.map(s=>s.replace(/\|/g,'/')).join(' | ')+' |');
+    row=null;
+  }
+  const TITLES=[[/^Accommodation Summary/i,'Accommodation Summary'],[/^Travel Summary/i,null],[/^Restaurants? Requiring Booking/i,null]];
+  let docTitle='';
+  pages.forEach((P,pi)=>{
+    const lines=groupLines(P.items);prevY=null;firstLineOfPage=true;
+    lines.forEach(L=>{
+      const tx=L.text;
+      const gapY=prevY===null?0:prevY-L.y;const newPage=firstLineOfPage;firstLineOfPage=false;
+      prevY=L.y;
+      if(L.x0<50){ /* body text outside tables */
+        flush();
+        if(pi===0&&L.h>12){docTitle=tx;return}
+        if(/^Day \d+\s+[—–-]/.test(tx)){mode=null;headOpen=true;out.push('','## '+tx);return}
+        if(headOpen&&!/^Accommodation:/i.test(tx)){out[out.length-1]+=' '+tx;return}
+        const am=tx.match(/^Accommodation:\s*(.*)$/i);
+        if(am){headOpen=false;out.push('Accommodation: '+am[1]);mode=null;return}
+        if(TITLES.some(t=>t[0].test(tx))){mode='hdr';out.push('','## '+tx);return}
+        mode=mode==='gen'?'after':mode;out.push(tx);return;
+      }
+      /* table lines */
+      const cs=cellsOf(L,10);
+      if(cs.length===3&&cs[0].text==='Time'&&cs[1].text==='Item'&&/^Comments?$/i.test(cs[2].text)){flush();mode='day';cols=cs.map(c=>c.x);return}
+      if(mode==='hdr'){flush();cols=cs.map(c=>c.x);mode='gen';out.push('| '+cs.map(c=>c.text).join(' | ')+' |','|'+cs.map(()=>'---').join('|')+'|');return}
+      if(mode==='day'){
+        const r=assign(L);
+        if(/^\d{1,2}:\d{2}/.test(r[0])){flush();row={kind:'day',c:r}}
+        else if(row){row.c=row.c.map((v,i)=>(newPage&&r[i]&&v.endsWith(r[i]))?v:addTxt(v,r[i]))}
+        else if(r.some(Boolean)){row={kind:'day',c:r}}
+        return}
+      if(mode==='gen'){
+        const r=assign(L);
+        const big=gapY>1.5*L.h;
+        if(!row||(r[0]&&(big||newPage))){flush();row={kind:'gen',c:r}}
+        else row.c=row.c.map((v,i)=>(newPage&&r[i]&&v.endsWith(r[i]))?v:addTxt(v,r[i]));
+        return}
+      out.push(tx);
+    });
+    lastPageIdx=pi;
+  });
+  flush();
+  return (docTitle?'# '+docTitle+'\n':'')+out.join('\n');
+}
 
+/* ---------- browser side: load pdf.js on demand and read a PDF file ---------- */
+const PDFJS_BASE='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+let pdfjsReady=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(pdfjsReady)return pdfjsReady;
+  pdfjsReady=new Promise((res,rej)=>{
+    const s=document.createElement('script');s.src=PDFJS_BASE+'pdf.min.js';
+    s.onload=async()=>{
+      try{const r=await fetch(PDFJS_BASE+'pdf.worker.min.js');const b=await r.blob();window.pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(b);}
+      catch(e){window.pdfjsLib.GlobalWorkerOptions.workerSrc=PDFJS_BASE+'pdf.worker.min.js';}
+      res(window.pdfjsLib);
+    };
+    s.onerror=()=>{pdfjsReady=null;rej(new Error('the PDF reader could not be loaded (it needs an internet connection the first time)'));};
+    document.head.appendChild(s);
+  });
+  return pdfjsReady;
+}
+async function pdfFileToText(file){
+  const lib=await loadPdfJs();
+  const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;
+  const pages=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p),tc=await pg.getTextContent();
+    pages.push({items:tc.items.filter(i=>i.str!=='').map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width,h:i.height}))});
+  }
+  const md=pdfItemsToMarkdown(pages);
+  if(!/^##\s+Day\s+\d+/m.test(md))throw new Error('no “Day 1 — …” headings were found in that PDF. It may be scanned or laid out differently; paste the text instead.');
+  return md;
+}
 /* ---- other formats ---- */
 function parseCSV(text){
   const rows=[];let row=[],cur='',q=false;
@@ -879,7 +1099,7 @@ const keyOf=i=>i.type+'|'+i.date+'|'+norm(i.title);
 function dice(a,b){a=norm(a).replace(/ /g,'');b=norm(b).replace(/ /g,'');if(a.length<2||b.length<2)return 0;const bg=s=>{const m=new Map();for(let i=0;i<s.length-1;i++){const g=s.slice(i,i+2);m.set(g,(m.get(g)||0)+1);}return m;};const A=bg(a),B=bg(b);let n=0;A.forEach((v,k)=>{if(B.has(k))n+=Math.min(v,B.get(k));});return 2*n/(a.length+b.length-2);}
 function jac(a,b){const A=new Set(norm(a).split(' ').filter(Boolean)),B=new Set(norm(b).split(' ').filter(Boolean));if(!A.size||!B.size)return 0;let n=0;A.forEach(x=>{if(B.has(x))n++;});return n/(A.size+B.size-n);}
 const snap=n=>{const o={};for(const f of IMPORT_FIELDS)o[f]=n[f]||'';return o;};
-function hasUserContent(i){return !!(i.notes&&i.notes.trim())||(i.atts&&i.atts.length)||i.mapLink||i.coordManual||i.link||i.ref;}
+function hasUserContent(i){const ed=['bk','ref','price','how','svc','bkNote'].some(f=>(i[f]||'')!==((i.imp&&i.imp[f])||''));return !!(i.notes&&i.notes.trim())||(i.atts&&i.atts.length)||i.mapLink||i.coordManual||i.link||ed;}
 function planImport(parsed,tripId){
   const existing=data.items.filter(i=>i.trip===tripId);
   const used=new Set(),rows=[];
@@ -944,6 +1164,7 @@ function applyImport(plan,parsed,o){
     if(d.notes&&(!cur.notes||cur.notes===cur.impNotes))cur.notes=d.notes;
     cur.impNotes=d.notes||'';
   }
+  if(parsed.unmatched)t.unmatched=parsed.unmatched;
   const r=tripRange(Object.assign({},t,{start:'',end:''}));
   if(r.start){t.start=r.start;t.end=r.end;}
   return t;
@@ -962,11 +1183,18 @@ async function pumpGeo(){
   while(geoQueue.length){
     const j=geoQueue.shift();
     if(data.geo[j.key]!==undefined){j.res(data.geo[j.key]);continue;}
+    let v,ok=false;
     try{
       const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=en&q='+encodeURIComponent(j.q));
-      if(!r.ok){j.res(null);}
-      else{const a=await r.json();const v=a[0]?{lat:+a[0].lat,lng:+a[0].lon}:null;data.geo[j.key]=v;j.res(v);}
-    }catch(e){j.res(null);}
+      if(r.ok){const a=await r.json();v=a[0]?{lat:+a[0].lat,lng:+a[0].lon}:null;ok=true;}
+    }catch(e){}
+    if(!ok){ /* Nominatim refused (e.g. page opened from a file) – try Photon, which has no referrer rule */
+      try{
+        const r=await fetch('https://photon.komoot.io/api/?limit=1&lang=en&q='+encodeURIComponent(j.q));
+        if(r.ok){const a=await r.json(),f=a.features&&a.features[0];v=f?{lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0]}:null;ok=true;}
+      }catch(e){}
+    }
+    if(ok){data.geo[j.key]=v;j.res(v);}else j.res(null);
     await sleep(1100);
   }
   geoBusy=false;
@@ -1001,7 +1229,7 @@ const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2
 function pinIcon(type,label){return L.divIcon({className:'',html:'<div class="pin k-'+type+'">'+esc(label||'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
 function newMap(el){
   const m=L.map(el,{scrollWheelZoom:true});
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'&copy; OpenStreetMap contributors'}).addTo(m);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{maxZoom:19,subdomains:'abcd',attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(m);
   m.setView([20,0],2);return m;
 }
 
@@ -1041,7 +1269,7 @@ function cardHtml(it,date){
   else if(it.type==='food'){const ml=(MEALS.find(m=>m[0]===it.meal)||[])[1];if(ml&&it.meal)sub.push(esc(ml));if(it.place)sub.push(esc(it.place));}
   else if(it.type==='stay'){if(it.address||it.place)sub.push(esc(it.address||it.place));if(date===it.date&&it.endDate)sub.push('until '+esc(fmtShort(it.endDate)));}
   else if(it.place)sub.push(esc(it.place));
-  return '<div class="card k-'+it.type+'" data-act="open" data-id="'+esc(it.id)+'" tabindex="0"><div class="ico">'+ico(iconFor(it))+'</div><div class="cb"><div class="t1">'+(tm?'<span class="tm">'+esc(tm)+'</span>':'')+esc(it.title)+tag+(it.gone?'<span class="mini" title="This item was not in the latest imported itinerary">not in latest import</span>':'')+'</div>'+
+  return '<div class="card k-'+it.type+'" data-act="open" data-id="'+esc(it.id)+'" tabindex="0"><div class="ico">'+ico(iconFor(it))+'</div><div class="cb"><div class="t1">'+(tm?'<span class="tm">'+esc(tm)+'</span>':'')+esc(it.title)+tag+bkTag(it)+(it.gone?'<span class="mini" title="This item was not in the latest imported itinerary">not in latest import</span>':'')+'</div>'+
     (sub.length?'<div class="t2">'+sub.join(' · ')+'</div>':'')+(it.notes&&it.notes.trim()?'<div class="nt">'+esc(it.notes)+'</div>':'')+'</div>'+badgesHtml(it)+'</div>';
 }
 function renderEmpty(){
@@ -1145,7 +1373,8 @@ function renderAll(){
   else{
     renderRail();
     if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
-    ({day:renderDay,cal:renderCal,agenda:renderAgenda,map:renderMapView}[view]||renderDay)();
+    ({day:renderDay,cal:renderCal,agenda:renderAgenda,map:renderMapView,reports:renderReports}[view]||renderDay)();
+    $('.layout').classList.toggle('rep',view==='reports');
   }
   $('#foot').textContent='Version '+VERSION;
 }
@@ -1162,7 +1391,7 @@ function fld(label,html,cls){return '<label class="f '+(cls||'')+'"><span>'+labe
 const inp=(id,v,type,ph)=>'<input id="'+id+'" type="'+(type||'text')+'" value="'+esc(v||'')+'"'+(ph?' placeholder="'+esc(ph)+'"':'')+'>';
 function openItem(id,type,date){
   const orig=id?itemById(id):null;
-  const draft=orig?JSON.parse(JSON.stringify(orig)):Object.assign({id:uid(),trip:selTrip,type,date:date||selDate,endDate:type==='stay'?addDays(date||selDate,1):'',time:'',endTime:'',slot:'',title:'',place:'',address:'',from:'',to:'',mode:type==='transport'?'train':'',meal:'',ref:'',link:'',mapLink:'',notes:'',atts:[],coord:null,fromCoord:null,toCoord:null,src:'manual'},{});
+  const draft=orig?JSON.parse(JSON.stringify(orig)):Object.assign({id:uid(),trip:selTrip,type,date:date||selDate,endDate:type==='stay'?addDays(date||selDate,1):'',time:'',endTime:'',slot:'',title:'',place:'',address:'',from:'',to:'',mode:type==='transport'?'train':'',meal:'',ref:'',link:'',mapLink:'',notes:'',atts:[],coord:null,fromCoord:null,toCoord:null,src:'manual',bk:'',price:'',how:'',svc:'',bkNote:''},{});
   ed={orig,draft,isNew:!orig,newAtts:new Set(),removed:[],saved:false,q0:{place:geoQ(draft,'place'),from:geoQ(draft,'from'),to:geoQ(draft,'to')}};
   const d=draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
   const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',transport:'Service / description'}[d.type];
@@ -1171,8 +1400,9 @@ function openItem(id,type,date){
   else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='activity')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld('Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld('Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld('Price',inp('f_price',d.price,'text','e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+'</div>';
   const dlg=$('#dlg');
-  dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+
+  dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+bkBlk+
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
@@ -1196,7 +1426,7 @@ function gmUrl(d){
 function readForm(){
   const d=ed.draft,g=id=>{const e=$('#'+id);return e?e.value.trim():null;};
   const set=(f,id)=>{const v=g(id);if(v!==null)d[f]=v;};
-  set('title','f_title');set('date','f_date');set('endDate','f_end');set('time','f_time');set('endTime','f_etime');set('address','f_addr');set('place','f_place');set('meal','f_meal');set('mode','f_mode');set('from','f_from');set('to','f_to');set('ref','f_ref');set('link','f_link');set('mapLink','f_maplink');
+  set('title','f_title');set('date','f_date');set('endDate','f_end');set('time','f_time');set('endTime','f_etime');set('address','f_addr');set('place','f_place');set('meal','f_meal');set('mode','f_mode');set('from','f_from');set('to','f_to');set('ref','f_ref');set('link','f_link');set('mapLink','f_maplink');set('bk','f_bk');set('price','f_price');set('svc','f_svc');set('how','f_how');set('bkNote','f_bknote');
   const n=$('#f_notes');if(n)d.notes=n.value;
   if(d.time)d.slot='';
 }
@@ -1283,7 +1513,7 @@ async function deleteItem(){
 
 /* ============ IMPORT DIALOG ============ */
 let imp=null;
-const FORMAT_HELP='# Japan trip\n\n## Day 1 – Mon 7 Dec 2026: Arrive Tokyo\n- Flight: Brisbane → Tokyo Haneda, depart 10:25, arrive 18:40\n- Train: Haneda Airport → Shinjuku (Keikyu + Metro), 19:30\n- Check-in: Groove Hotel Shinjuku (4 nights)\n- 20:30 Dinner at Omoide Yokocho\n\n## Day 2 – Tue 8 Dec\n### Activities\n- 09:00 Senso-ji Temple, Asakusa\n- 14:00 teamLab Planets\n### Meals\n- Lunch: Ichiran Ramen, Shibuya\n### Transport\n- 08:30 Metro Shinjuku → Asakusa\n\nAlso accepted: tables (Time | Activity | Transport), CSV (date,time,type,title,place,from,to,notes), and JSON exported from this tool.';
+const FORMAT_HELP='# Japan trip\n\n## Day 1 – Mon 7 Dec 2026: Arrive Tokyo\n- Flight: Brisbane → Tokyo Haneda, depart 10:25, arrive 18:40\n- Train: Haneda Airport → Shinjuku (Keikyu + Metro), 19:30\n- Check-in: Groove Hotel Shinjuku (4 nights)\n- 20:30 Dinner at Omoide Yokocho\n\n## Day 2 – Tue 8 Dec\n### Activities\n- 09:00 Senso-ji Temple, Asakusa\n- 14:00 teamLab Planets\n### Meals\n- Lunch: Ichiran Ramen, Shibuya\n### Transport\n- 08:30 Metro Shinjuku → Asakusa\n\nAn itinerary PDF (Time / Item / Comments tables per day, plus accommodation, travel and restaurant booking tables) is read in your browser and shown here as text before you preview it.\n\nAlso accepted: tables (Time | Activity | Transport), CSV (date,time,type,title,place,from,to,notes), and JSON exported from this tool.';
 function openImport(){
   imp={stage:1,parsed:null,plan:null,text:imp&&imp.text||''};
   const t=trip();
@@ -1291,8 +1521,8 @@ function openImport(){
   dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('map')+'<span>Import itinerary</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db" id="impBody">'+
     (t?'<label class="f"><span>Where should it go?</span><select id="i_mode"><option value="merge">Update “'+esc(t.name)+'” — keep notes, attachments and maps for items that haven’t changed</option><option value="new">Create a new trip</option></select></label>':'<input type="hidden" id="i_mode" value="new">')+
     '<div class="grid3" id="i_newrow">'+fld('New trip name','<input id="i_name" placeholder="e.g. Japan Dec 2026">')+fld('Place hint for maps',inp('i_region',t?t.region:'','text','e.g. Japan'))+fld('Day 1 date (if days have no dates)',inp('i_start',t&&t.start||'','date'))+'</div>'+
-    '<label class="f"><span>Paste the itinerary, or choose a file (.txt .md .csv .json)</span><textarea id="i_text" style="min-height:200px" placeholder="Paste your itinerary here…">'+esc(imp.text)+'</textarea></label>'+
-    '<div><input type="file" id="i_file" accept=".txt,.md,.csv,.json,text/*,application/json"> <details style="margin-top:8px"><summary class="hint" style="cursor:pointer">What format works best?</summary><pre class="fmt">'+esc(FORMAT_HELP)+'</pre></details></div></div>'+
+    '<label class="f"><span>Paste the itinerary, or choose a file (.pdf .txt .md .csv .json)</span><textarea id="i_text" style="min-height:200px" placeholder="Paste your itinerary here…">'+esc(imp.text)+'</textarea></label>'+
+    '<div><input type="file" id="i_file" accept=".pdf,.txt,.md,.csv,.json,application/pdf,text/*,application/json"> <details style="margin-top:8px"><summary class="hint" style="cursor:pointer">What format works best?</summary><pre class="fmt">'+esc(FORMAT_HELP)+'</pre></details></div></div>'+
     '<div class="df"><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="impPreview">Preview</button></div></div>';
   dlg.onclose=null;dlg.showModal();syncImpMode();
 }
@@ -1367,6 +1597,79 @@ function openData(){
     '<div class="hint">Maps use OpenStreetMap tiles and the free Nominatim search; routes for cars use the public OSRM demo server. Place lookups are rate-limited to about one per second.</div></div><div class="df"><button class="btn primary" data-act="dclose">Done</button></div></div>';
   dlg.onclose=null;if(!dlg.open)dlg.showModal();
 }
+/* ============ REPORTS: accommodation, meals, transport (with bookings) ============ */
+let repTab='stay',repAll=false;
+const BK_SHORT={confirmed:'Booked',tobook:'To book',optional:'Recommended',included:'Included',none:'No booking'};
+const bkTag=it=>(it.bk&&it.bk!=='none')?'<span class="bk bk-'+it.bk+'">'+BK_SHORT[it.bk]+'</span>':'';
+const isBookable=i=>['confirmed','tobook','optional','included'].includes(i.bk)||(i.type==='transport'&&i.mode==='flight');
+const modeLabel=m=>(MODES.find(x=>x[0]===m)||[])[1]||'';
+const when=(d,t)=>fmtShort(d)+(t?' '+t:'');
+const trunc=(s,n)=>{s=String(s||'').replace(/\s+/g,' ').trim();return s.length>n?s.slice(0,n-1)+'…':s;};
+const REP={
+  stay:{label:'Accommodation',cols:[
+    ['Check-in',i=>when(i.date,i.time)],['Check-out',i=>when(i.endDate,i.endTime)],['Nights',i=>String(Math.max(1,diffDays(i.date,i.endDate||addDays(i.date,1))))],
+    ['Accommodation',i=>i.title],['City / address',i=>i.address||i.place],['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote],['Notes',i=>trunc(i.notes,160)]]},
+  food:{label:'Meals',cols:[
+    ['Date',i=>fmtShort(i.date)],['Meal',i=>(MEALS.find(m=>m[0]===i.meal)||[])[1]||''],['Time',i=>i.time+(i.endTime?'–'+i.endTime:'')],['Restaurant / meal',i=>i.title],['Where',i=>i.place],
+    ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote],['Notes',i=>trunc(i.notes,160)]]},
+  transport:{label:'Transport',cols:[
+    ['Date',i=>fmtShort(i.date)],['Depart',i=>i.time],['Arrive',i=>i.endTime],['Journey',i=>(i.from||i.to)?i.from+' → '+i.to:i.title],['Mode',i=>modeLabel(i.mode)],['Service',i=>i.svc],
+    ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote]]}
+};
+function repItems(tab){
+  let its=tripItems().filter(i=>i.type===tab);
+  if(tab!=='stay'&&!repAll)its=its.filter(isBookable);
+  return its.sort((a,b)=>(a.date+(tab==='stay'?'':sortKey(a))).localeCompare(b.date+(tab==='stay'?'':sortKey(b))));
+}
+function priceTotals(its){
+  const tot={};
+  its.forEach(i=>{const m=String(i.price||'').match(/(A\$|AU\$|AUD|US\$|\$|¥|JPY|£|€)\s?(\d[\d,]*(?:\.\d+)?)/i);if(!m)return;
+    let c=m[1].toUpperCase();c=({'AU$':'A$','AUD':'A$','JPY':'¥'}[c])||c;const v=parseFloat(m[2].replace(/,/g,''));tot[c]=(tot[c]||0)+v;});
+  return Object.entries(tot).map(([c,v])=>c+v.toLocaleString(undefined,{maximumFractionDigits:2})).join(' + ');
+}
+function nightsGap(){
+  const t=trip(),r=tripRange(t);if(!r.start)return [];
+  const stays=tripItems().filter(i=>i.type==='stay'),out=[];
+  for(let d=r.start;d<r.end;d=addDays(d,1)){if(!stays.some(s=>s.date<=d&&d<(s.endDate||addDays(s.date,1))))out.push(d);}
+  return out;
+}
+function repUnmatchedHtml(tab){
+  const t=trip(),u=t&&t.unmatched;if(!u)return '';
+  const rows=tab==='food'?(u.rests||[]):tab==='transport'?(u.legs||[]):[];
+  if(!rows.length)return '';
+  return '<div class="rep-un"><h4>In the itinerary’s booking table but not linked to a day</h4><ul>'+rows.map(r=>tab==='food'
+    ?'<li><b>'+esc(r.name)+'</b>'+(r.date?' · '+esc(fmtShort(r.date)):'')+' — '+esc(r.win||'')+(r.how?' · '+esc(r.how):'')+'</li>'
+    :'<li><b>'+esc(r.leg)+'</b> — '+esc(r.mode||'')+' · '+esc(r.price||'')+' · '+esc(r.rsv||'')+(r.how?' · '+esc(r.how):'')+'</li>').join('')+'</ul></div>';
+}
+function renderReports(){
+  const t=trip(),R=REP[repTab],its=repItems(repTab);
+  const all=tripItems().filter(i=>i.type===repTab);
+  const cnt=s=>all.filter(i=>i.bk===s).length;
+  const tabs=Object.keys(REP).map(k=>'<button data-act="reptab" data-tab="'+k+'" class="'+(k===repTab?'on':'')+'">'+REP[k].label+' <span class="n">'+tripItems().filter(i=>i.type===k&&(k==='stay'||isBookable(i))).length+'</span></button>').join('');
+  const gaps=repTab==='stay'?nightsGap():[];
+  const nights=repTab==='stay'?its.reduce((n,i)=>n+Math.max(1,diffDays(i.date,i.endDate||addDays(i.date,1))),0):0;
+  const chips='<span class="bk bk-confirmed">'+cnt('confirmed')+' booked</span><span class="bk bk-tobook">'+cnt('tobook')+' to book</span><span class="bk bk-optional">'+cnt('optional')+' recommended</span><span class="bk bk-included">'+cnt('included')+' included</span>'+(repTab==='stay'?'<span class="bk">'+nights+' nights</span>':'');
+  const pc=priceTotals(its.filter(i=>i.bk==='confirmed')),pa=priceTotals(its);
+  let h='<div class="rep"><div class="rep-bar nop"><div class="seg" id="repSeg">'+tabs+'</div><span class="sp"></span>'+
+    (repTab!=='stay'?'<label class="chk"><input type="checkbox" id="rep_all" '+(repAll?'checked':'')+'> Show everything, not just bookings</label>':'')+
+    '<button class="btn" data-act="repcsv">Download CSV</button><button class="btn" data-act="repprint">Print</button></div>'+
+    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+'</h2><div class="rep-chips">'+chips+'</div>'+
+    (pa?'<div class="hint">Listed prices (first figure on each line; “pp” means per person): '+(pc?'<b>booked '+esc(pc)+'</b> · ':'')+'all listed '+esc(pa)+'</div>':'')+
+    (gaps.length?'<div class="hint" style="color:var(--warn)">⚠ No accommodation for the night of '+gaps.map(d=>esc(fmtShort(d))).join(', ')+'</div>':'')+'</div>';
+  if(!its.length)h+='<div class="empty"><p>Nothing to show here yet.'+(repTab!=='stay'&&!repAll?' Tick “Show everything” to list every '+(repTab==='food'?'meal':'journey')+', or open an item and set its booking status.':'')+'</p></div>';
+  else h+='<div class="rep-wrap"><table class="rep-t"><thead><tr>'+R.cols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr></thead><tbody>'+its.map(i=>'<tr class="k-'+i.type+'" data-act="open" data-id="'+esc(i.id)+'" tabindex="0">'+R.cols.map(c=>{
+    const v=c[1](i)||'';
+    if(c[0]==='Status')return '<td>'+(i.bk?'<span class="bk bk-'+i.bk+'">'+esc(v)+'</span>':'<span class="hint">—</span>')+'</td>';
+    return '<td'+(/^(Accommodation|Restaurant|Journey)/.test(c[0])?' class="strong"':'')+'>'+esc(v)+'</td>';}).join('')+'</tr>').join('')+'</tbody></table></div>';
+  h+=repUnmatchedHtml(repTab);
+  $('#main').innerHTML=h+'</div>';
+}
+function repCsv(){
+  const R=REP[repTab],its=repItems(repTab);
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const rows=[R.cols.map(c=>q(c[0])).join(',')].concat(its.map(i=>R.cols.map(c=>q(c[1](i))).join(',')));
+  download((trip().name||'trip').replace(/[^\w\-]+/g,'-')+'-'+repTab+'-report.csv','﻿'+rows.join('\r\n'),'text/csv');
+}
 
 /* ============ EVENTS ============ */
 function go(date){selDate=date;view='day';try{localStorage.setItem(LS_VIEW,view);}catch(e){}renderAll();window.scrollTo({top:0});}
@@ -1401,6 +1704,9 @@ function onAct(el,e){
     case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
     case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
     case 'locate':locateAll();break;
+    case 'reptab':repTab=el.dataset.tab;renderAll();break;
+    case 'repcsv':repCsv();break;
+    case 'repprint':window.print();break;
     case 'dclose':{const d=el.closest('dialog');if(d)d.close();break;}
     case 'pickfile':pickFiles(el.dataset.zone);break;
     case 'rmatt':{const id=el.dataset.id,i=ed.draft.atts.findIndex(a=>a.id===id);if(i>=0){const a=ed.draft.atts.splice(i,1)[0];if(ed.newAtts.has(id)){ed.newAtts.delete(id);removeAttFiles(a);}else ed.removed.push(a);readForm();renderAtts();}break;}
@@ -1445,9 +1751,15 @@ $('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
+  if(t.id==='rep_all'){repAll=t.checked;renderAll();}
   if(t.id==='i_file'&&t.files[0]){
-    const f=t.files[0];const rd=new FileReader();
-    rd.onload=()=>{$('#i_text').value=String(rd.result);const n=$('#i_name');if(n&&!n.value)n.value=f.name.replace(/\.[^.]+$/,'');};rd.readAsText(f);
+    const f=t.files[0];
+    if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){
+      const ta=$('#i_text');ta.value='Reading the PDF…';
+      pdfFileToText(f).then(txt=>{ta.value=txt;toast('PDF read. Check the text below, then press Preview.');})
+        .catch(err=>{ta.value='';toast('Could not read that PDF: '+(err&&err.message||err));});
+    }else{const rd=new FileReader();
+    rd.onload=()=>{$('#i_text').value=String(rd.result);};rd.readAsText(f);}
   }
   if(t.id==='bk_file'&&t.files[0]){
     const rd=new FileReader();
@@ -1482,7 +1794,7 @@ document.addEventListener('drop',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&msalAccount&&!ed)syncFromOneDrive();});
 
 /* ============ START ============ */
-window.__travel={parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
+window.__travel={geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
 (async function init(){
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
