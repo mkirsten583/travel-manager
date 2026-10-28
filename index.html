@@ -11,14 +11,14 @@
 :root{
   --bg:#edf0f3; --surface:#fff; --wk:#f5f7f9; --ink:#15212b; --muted:#5a6773; --line:#d3dae1; --hover:#e8edf1;
   --danger:#b3261e; --ok:#2e7d4f; --warn:#b26a00;
-  --c-stay:#8a5a2b; --c-food:#c0562a; --c-act:#8e44ad; --c-trans:#2b6cb0;
+  --c-stay:#8a5a2b; --c-food:#c0562a; --c-act:#8e44ad; --c-trans:#2b6cb0; --c-other:#5b7083;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#11161b; --surface:#1a2129; --wk:#171d24; --ink:#e7ecf0; --muted:#94a1ad; --line:#2d3740; --hover:#242e37;
     --danger:#ff8a80; --ok:#7ad39c; --warn:#f0b85a;
-    --c-stay:#d9a56b; --c-food:#f09a70; --c-act:#cf9de6; --c-trans:#7db4ff;}
+    --c-stay:#d9a56b; --c-food:#f09a70; --c-act:#cf9de6; --c-trans:#7db4ff; --c-other:#a9b8c6;}
 }
-.k-stay{--k:var(--c-stay)} .k-food{--k:var(--c-food)} .k-activity{--k:var(--c-act)} .k-transport{--k:var(--c-trans)}
+.k-stay{--k:var(--c-stay)} .k-food{--k:var(--c-food)} .k-activity{--k:var(--c-act)} .k-transport{--k:var(--c-trans)} .k-other{--k:var(--c-other)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
@@ -234,13 +234,15 @@ const TYPES=[
   {id:'stay',label:'Accommodation',add:'Accommodation',icon:'bed'},
   {id:'food',label:'Meals & food',add:'Meal / food',icon:'food'},
   {id:'activity',label:'Activities',add:'Activity',icon:'star'},
-  {id:'transport',label:'Transport',add:'Transport',icon:'train'}
+  {id:'transport',label:'Transport',add:'Transport',icon:'train'},
+  {id:'other',label:'Other',add:'Other',icon:'tag'}
 ];
 const TYPE_BY_ID=Object.fromEntries(TYPES.map(t=>[t.id,t]));
 const MODES=[['train','Train / metro'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
 const MEALS=[['','—'],['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack / drink']];
 const IMPORT_FIELDS=['title','date','endDate','time','endTime','slot','place','from','to','mode','meal','bk','ref','price','how','svc','bkNote'];
 const ICONS={
+  tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8Z"/><circle cx="7" cy="7" r="1.5"/>',
   bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
   food:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
   star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
@@ -1101,7 +1103,7 @@ function parseAny(text,opts){
       const g=n=>{const i=col(n);return i>=0?(r[i]||'').trim():'';};
       const dt=findDate(g('date'),opts&&opts.start);if(!dt){res.warnings.push('Skipped a row with no valid date.');continue;}
       const it=Object.assign(blankItem(),{date:dt.iso,time:toHHMM(g('time')||g('start')),endTime:toHHMM(g('end')),title:g('title')||g('activity')||g('item'),place:g('place')||g('location'),from:g('from'),to:g('to'),mode:g('mode'),notes:g('notes')});
-      const ty=g('type')||g('category');it.type=sectionOf(ty)||(/stay|hotel|accom/i.test(ty)?'stay':/food|meal/i.test(ty)?'food':/transport|travel/i.test(ty)?'transport':/activ/i.test(ty)?'activity':classify(it.title));
+      const ty=g('type')||g('category');it.type=sectionOf(ty)||(/stay|hotel|accom/i.test(ty)?'stay':/food|meal/i.test(ty)?'food':/transport|travel/i.test(ty)?'transport':/activ/i.test(ty)?'activity':/other|misc/i.test(ty)?'other':classify(it.title));
       if(it.type==='stay')it.endDate=findDate(g('end date')||g('check'),opts&&opts.start)?.iso||addDays(it.date,1);
       if(!it.title)continue;res.items.push(it);
     }
@@ -1241,7 +1243,7 @@ async function drawRoute(map,a,b,mode,color){
   const line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);
   return {line,note};
 }
-const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0'};
+const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0',other:'#5b7083'};
 function pinIcon(type,label){return L.divIcon({className:'',html:'<div class="pin k-'+type+'">'+esc(label||'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
 function newMap(el){
   const m=L.map(el,{scrollWheelZoom:true});
@@ -1301,12 +1303,13 @@ function renderDay(){
     '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>';
   for(const ty of TYPES){
     const its=itemsOnDay(selDate,ty.id);
+    if(ty.id==='other'&&!its.length)continue;
     h+='<section class="sec k-'+ty.id+'"><header>'+ico(ty.icon)+'<span>'+ty.label+'</span><span class="cnt">'+(its.length?its.length:'')+'</span><span class="sp"></span><button class="btn sm" data-act="add" data-type="'+ty.id+'">+ Add</button></header>'+
       (its.length?'<div class="list">'+its.map(x=>cardHtml(x,selDate)).join('')+'</div>':'<div class="none">Nothing planned.</div>')+'</section>';
   }
   $('#main').innerHTML=h;
 }
-let calTypes={stay:true,food:true,activity:true,transport:true};
+let calTypes={stay:true,food:true,activity:true,transport:true,other:true};
 try{const s=JSON.parse(localStorage.getItem('travel-mgr-caltypes-v1')||'null');if(s&&typeof s==='object')for(const k of Object.keys(calTypes))if(typeof s[k]==='boolean')calTypes[k]=s[k];}catch(e){}
 function calFilterHtml(){
   const on=TYPES.filter(ty=>calTypes[ty.id]).length;
@@ -1423,11 +1426,11 @@ function openItem(id,type,date){
 function renderItemDialog(first){
   if(edMap){edMap.remove();edMap=null;}
   const d=ed.draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
-  const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',transport:'Service / description'}[d.type];
+  const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',other:'Item / event',transport:'Service / description'}[d.type];
   let f=fld('Type','<select id="f_type">'+TYPES.map(x=>'<option value="'+x.id+'"'+(x.id===d.type?' selected':'')+'>'+x.label+'</option>').join('')+'</select>')+fld(titleLbl,inp('f_title',d.title));
   if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
-  else if(d.type==='activity')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld('Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else if(d.type==='activity'||d.type==='other')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld(d.type==='other'?'Reference':'Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld('Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld('Price',inp('f_price',d.price,'text','e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+'</div>';
   const dlg=$('#dlg');
