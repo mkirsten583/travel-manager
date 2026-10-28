@@ -186,6 +186,8 @@ pre.fmt{background:var(--bg);border:1px solid var(--line);border-radius:8px;padd
 .rep-t tbody tr{cursor:pointer}.rep-t tbody tr:hover{background:#8881}
 .rep-un{margin-top:14px;font-size:13px}.rep-un h4{margin:0 0 4px}.rep-un li{margin:2px 0}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
+.srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
+.calfilt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.fchip{display:inline-flex;gap:5px;align-items:center;font:inherit;font-size:13px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;opacity:.7}.fchip.on{background:var(--k);color:var(--surface);border-color:var(--k);opacity:1}.fchip svg{width:14px;height:14px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@3/lib/msal-browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -289,7 +291,7 @@ const msalConfigured=()=>{const c=clientId();return !!c&&!/PASTE/i.test(c);};
 function normalise(o){
   o=(o&&typeof o==='object')?o:{};
   const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
-  for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';}
+  for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];}
   for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
   return d;
 }
@@ -310,9 +312,21 @@ function tripDays(t){
 }
 function sortKey(it){return (it.time||SLOT_TIME[it.slot]||'99:99')+'|'+(it.title||'');}
 const SLOT_TIME={Morning:'09:00',Afternoon:'14:00',Evening:'18:00',Night:'21:00'};
+/* order within a day: by start time (00:00–03:59 counts as after midnight); untimed items follow the item before them in the itinerary */
+function minOf(t){const m=/^(\d{1,2}):(\d{2})/.exec(t||'');if(!m)return null;let v=+m[1]*60+ +m[2];if(v<240)v+=1440;return v;}
+function dayOrder(date){
+  const its=tripItems().filter(i=>i.type!=='stay'&&i.date===date);
+  const eff=[];let last=null;
+  its.forEach((i,k)=>{let v=minOf(i.time);if(v==null&&i.slot&&SLOT_TIME[i.slot])v=minOf(SLOT_TIME[i.slot]);
+    if(v!=null){last=v;eff[k]=v;}else eff[k]=last==null?null:last+0.001*(k+1);});
+  let next=null;for(let k=its.length-1;k>=0;k--){if(eff[k]!=null)next=eff[k];else eff[k]=next==null?99999:next-0.5+0.0001*k;}
+  const m=new Map();its.forEach((i,k)=>m.set(i.id,eff[k]+k/100000));return m;
+}
 function itemsOnDay(date,type){
-  return tripItems().filter(i=>i.type===type&&(i.type==='stay'?(i.date&&i.date<=date&&date<=(i.endDate||i.date)):i.date===date))
-    .sort((a,b)=>sortKey(a).localeCompare(sortKey(b)));
+  const arr=tripItems().filter(i=>i.type===type&&(i.type==='stay'?(i.date&&i.date<=date&&date<=(i.endDate||i.date)):i.date===date));
+  if(type==='stay')return arr.sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))||a.title.localeCompare(b.title));
+  const m=dayOrder(date);
+  return arr.sort((a,b)=>(m.get(a.id)||0)-(m.get(b.id)||0));
 }
 
 /* ---------- persistence ---------- */
@@ -470,6 +484,7 @@ async function sweepUploads(){
   try{
     let n=0;
     for(const it of data.items)for(const a of it.atts){if(!a.up&&await uploadAtt(a))n++;}
+    for(const tr of data.trips)for(const s of (tr.sources||[]))if(s.att&&!s.att.up&&await uploadAtt(s.att))n++;
     if(n){cacheLocal();rev++;clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToOneDrive(),300);}
   }finally{sweeping=false;}
 }
@@ -675,6 +690,7 @@ function parseItinerary(text,opts){
     if(!type&&secIn)type=(secIn==='activity'&&/^\W*(breakfast|brunch|lunch|dinner|supper)\b/i.test(head))?'food':secIn;
     if(!type&&hint)type=hint.type;
     if(!type)type=classify(head);
+    if(/^\W*break\b/i.test(head)&&type!=='transport'&&type!=='stay')type='activity';
     if(extra&&extra.type)type=extra.type;
     const isOut=/\bcheck[- ]?out\b|\bcheckout\b/i.test((label||'')+' '+t);
     if(type==='stay'){
@@ -1290,20 +1306,28 @@ function renderDay(){
   }
   $('#main').innerHTML=h;
 }
+let calTypes={stay:true,food:true,activity:true,transport:true};
+try{const s=JSON.parse(localStorage.getItem('travel-mgr-caltypes-v1')||'null');if(s&&typeof s==='object')for(const k of Object.keys(calTypes))if(typeof s[k]==='boolean')calTypes[k]=s[k];}catch(e){}
+function calFilterHtml(){
+  const on=TYPES.filter(ty=>calTypes[ty.id]).length;
+  return '<div class="calfilt nop"><span class="hint">Show:</span>'+TYPES.map(ty=>'<button class="fchip k-'+ty.id+(calTypes[ty.id]?' on':'')+'" data-act="caltype" data-type="'+ty.id+'" aria-pressed="'+!!calTypes[ty.id]+'">'+ico(ty.icon)+ty.label+'</button>').join('')+
+    '<button class="linkbtn" data-act="calall">'+(on===TYPES.length?'Clear all':'Show all')+'</button></div>';
+}
 function renderCal(){
   const t=trip(),r=tripRange(t);
   if(!r.start){$('#main').innerHTML='<div class="empty"><p>No dates yet.</p></div>';return;}
   const dow=d=>(parseISO(d).getDay()+6)%7;
   const start=addDays(r.start,-dow(r.start)),end=addDays(r.end,6-dow(r.end));
-  let h='<div class="cal"><div class="hd">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="wk" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">';
+  let h=calFilterHtml()+'<div class="cal"><div class="hd">'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(x=>'<div>'+x+'</div>').join('')+'</div><div class="wk" style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr))">';
   for(let d=start;d<=end;d=addDays(d,1)){
     const inn=d>=r.start&&d<=r.end,dt=parseISO(d);
     if(!inn){h+='<div class="cd out"><div class="dn"><span>'+dt.getDate()+(dt.getDate()===1?' '+MN[dt.getMonth()]:'')+'</span></div></div>';continue;}
-    const chips=[];
-    for(const ty of TYPES)for(const it of itemsOnDay(d,ty.id)){
+    const chipsK=[],om=dayOrder(d);
+    for(const ty of TYPES){if(!calTypes[ty.id])continue;for(const it of itemsOnDay(d,ty.id)){
       if(it.type==='stay'&&d!==it.date&&d!==it.endDate)continue;
-      chips.push('<div class="chip k-'+it.type+'">'+ico(iconFor(it))+'<span>'+esc((it.type==='stay'?(d===it.date?'In: ':'Out: '):(it.time?it.time+' ':''))+it.title)+'</span></div>');
-    }
+      chipsK.push([it.type==='stay'?(d===it.date?-2:99998):(om.get(it.id)||0),'<div class="chip k-'+it.type+'">'+ico(iconFor(it))+'<span>'+esc((it.type==='stay'?(d===it.date?'In: ':'Out: '):(it.time?it.time+' ':''))+it.title)+'</span></div>']);
+    }}
+    const chips=chipsK.sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
     const dd=t.days[d]||{};
     h+='<div class="cd'+(d===selDate?' sel':'')+'" data-act="goday" data-date="'+d+'" title="'+esc(dd.title||'')+'"><div class="dn"><b>'+dt.getDate()+(dt.getDate()===1||d===r.start?' '+MN[dt.getMonth()]:'')+'</b><span>Day '+(diffDays(r.start,d)+1)+'</span></div>'+
       (dd.title?'<div class="more" style="color:var(--ink);font-weight:600">'+esc(dd.title)+'</div>':'')+chips.slice(0,4).join('')+(chips.length>4?'<div class="more">+'+(chips.length-4)+' more</div>':'')+'</div>';
@@ -1316,7 +1340,7 @@ function renderAgenda(){
   $('#main').innerHTML=days.map((d,i)=>{
     const dd=t.days[d]||{};
     const its=[];for(const ty of TYPES)itemsOnDay(d,ty.id).forEach(x=>{if(x.type==='stay'&&d!==x.date&&d!==x.endDate)return;its.push(x);});
-    its.sort((a,b)=>(a.type==='stay'?'00:00':sortKey(a)).localeCompare(b.type==='stay'?'00:00':sortKey(b)));
+    const om=dayOrder(d);its.sort((a,b)=>(a.type==='stay'?(d===a.date?-2:99998):(om.get(a.id)||0))-(b.type==='stay'?(d===b.date?-2:99998):(om.get(b.id)||0)));
     return '<div class="agday"><h3>Day '+(i+1)+' · '+esc(fmtLong(d))+(dd.title?' — '+esc(dd.title):'')+'</h3>'+(dd.notes?'<div class="hint" style="margin-bottom:4px;white-space:pre-wrap">'+esc(dd.notes)+'</div>':'')+
       (its.length?its.map(x=>'<div class="agi k-'+x.type+'" data-act="open" data-id="'+esc(x.id)+'"><span class="tm">'+esc(x.type==='stay'?(d===x.date?'In':'Out'):(x.time||x.slot||''))+'</span><span class="ico">'+ico(iconFor(x))+'</span><span><b>'+esc(x.title)+'</b>'+(x.type==='transport'&&(x.from||x.to)?' <span class="hint">'+esc(x.from)+' → '+esc(x.to)+'</span>':x.place?' <span class="hint">'+esc(x.place)+'</span>':'')+'</span></div>').join(''):'<div class="hint">Nothing planned.</div>')+'</div>';
   }).join('');
@@ -1532,8 +1556,8 @@ async function deleteItem(){
 /* ============ IMPORT DIALOG ============ */
 let imp=null;
 const FORMAT_HELP='# Japan trip\n\n## Day 1 – Mon 7 Dec 2026: Arrive Tokyo\n- Flight: Brisbane → Tokyo Haneda, depart 10:25, arrive 18:40\n- Train: Haneda Airport → Shinjuku (Keikyu + Metro), 19:30\n- Check-in: Groove Hotel Shinjuku (4 nights)\n- 20:30 Dinner at Omoide Yokocho\n\n## Day 2 – Tue 8 Dec\n### Activities\n- 09:00 Senso-ji Temple, Asakusa\n- 14:00 teamLab Planets\n### Meals\n- Lunch: Ichiran Ramen, Shibuya\n### Transport\n- 08:30 Metro Shinjuku → Asakusa\n\nAn itinerary PDF (Time / Item / Comments tables per day, plus accommodation, travel and restaurant booking tables) is read in your browser and shown here as text before you preview it.\n\nAlso accepted: tables (Time | Activity | Transport), CSV (date,time,type,title,place,from,to,notes), and JSON exported from this tool.';
-function openImport(){
-  imp={stage:1,parsed:null,plan:null,text:imp&&imp.text||''};
+function openImport(keep){
+  imp={stage:1,parsed:null,plan:null,text:imp&&imp.text||'',file:keep===true&&imp?imp.file:null};
   const t=trip();
   const dlg=$('#dlg');
   dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('map')+'<span>Import itinerary</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db" id="impBody">'+
@@ -1574,6 +1598,7 @@ function doImport(){
   const mode=imp.mode;
   const t=applyImport(imp.plan,imp.parsed,{tripId:imp.tripId,name:imp.newName,region:imp.region,removeMissing:rm});
   selTrip=t.id;view='day';const days=tripDays(t);selDate=days[0]||null;
+  saveImportSource(t);imp.file=null;
   $('#dlg').close();changed();renderAll();
   toast('Itinerary imported. Undo it from Data & sync if needed.');
   if(mode==='new'&&t.region)toast('Imported. Use Map → Find places on map to pin everything.');
@@ -1586,9 +1611,48 @@ function openTrip(isNew){
   dlg.innerHTML='<div class="dbody"><div class="dh"><span>'+(t?'Trip settings':'New trip')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
     fld('Trip name',inp('t_name',t?t.name:''))+'<div class="grid2">'+fld('First day',inp('t_start',t?t.start:'','date'))+fld('Last day',inp('t_end',t?t.end:'','date'))+'</div>'+
     fld('Place hint for map searches',inp('t_region',t?t.region:'','text','e.g. Japan — added to place searches so “Ginza” finds the right one'))+
-    '<div class="hint">Days outside this range appear automatically if you add items on them.</div></div><div class="df">'+
+    '<div class="hint">Days outside this range appear automatically if you add items on them.</div>'+(t?srcBlockHtml(t):'')+'</div><div class="df">'+
     (t?'<button class="btn danger l" data-act="deltrip">Delete trip</button><button class="btn" data-act="exporttrip">Export JSON</button>':'')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="savetrip" data-new="'+(t?'':'1')+'">Save</button></div></div>';
   dlg.onclose=null;dlg.showModal();
+}
+function srcBlockHtml(t){
+  const s=t.sources||[];
+  if(!s.length)return '<div class="blk"><h4>Imported itineraries</h4><div class="hint">A copy of each itinerary you import (the original PDF, if there was one, and its text) is kept here so you can always get back to it.</div></div>';
+  return '<div class="blk"><h4>Imported itineraries <span class="mini">latest '+s.length+' kept</span></h4>'+s.map(x=>'<div class="srcrow"><div><b>'+esc(x.name)+'</b><div class="hint">'+esc(new Date(x.when).toLocaleString())+' · '+Math.round((x.text||'').length/1000)+'k characters of text'+(x.att?' · original file '+Math.max(1,Math.round((x.att.size||0)/1024))+' KB':'')+'</div></div><div class="srcbtn">'+
+    (x.att?'<button class="btn sm" data-act="srcopen" data-id="'+esc(x.id)+'">Open original</button>':'')+'<button class="btn sm" data-act="srctext" data-id="'+esc(x.id)+'">View text</button><button class="btn sm" data-act="srcdl" data-id="'+esc(x.id)+'">Download text</button><button class="btn sm danger" data-act="srcdel" data-id="'+esc(x.id)+'">Remove</button></div></div>').join('')+'</div>';
+}
+function srcById(id){const t=trip();return t&&(t.sources||[]).find(x=>x.id===id);}
+async function srcOpen(id){
+  const s=srcById(id);if(!s||!s.att)return;
+  const b=await attBlob(s.att);
+  if(!b){toast(msalAccount?'The original is not available yet.':'The original is not on this device. Sign in to fetch it from OneDrive.');return;}
+  const u=URL.createObjectURL(b);
+  if(s.att.type==='application/pdf')window.open(u,'_blank');
+  else{const l=document.createElement('a');l.href=u;l.download=s.att.name;document.body.appendChild(l);l.click();l.remove();}
+  setTimeout(()=>URL.revokeObjectURL(u),60000);
+}
+function srcText(id){const s=srcById(id);if(!s)return;window.open(URL.createObjectURL(new Blob([s.text||''],{type:'text/plain;charset=utf-8'})),'_blank');}
+function srcDownload(id){const s=srcById(id);if(!s)return;download(safeName((s.name||'itinerary').replace(/\.[^.]+$/,''))+'-'+toISO(new Date(s.when))+'.md',s.text||'','text/markdown');}
+async function srcRemove(id){
+  const t=trip(),s=srcById(id);if(!s)return;
+  const c=await askChoice('Remove this saved copy?','“'+s.name+'” will be removed from this trip. Your items are not affected.',['Remove','Keep it']);
+  if(c!==0)return;
+  t.sources=t.sources.filter(x=>x.id!==id);if(s.att)removeAttFiles(s.att);changed();openTrip(false);
+}
+async function saveImportSource(t){
+  const text=imp.text||'';if(!text.trim())return;
+  const file=imp.file;
+  const s={id:uid(),name:file?file.name:'Pasted itinerary',when:Date.now(),text};
+  if(file){
+    const a=newAtt(file,false);
+    if(await idbPut(a.id,file)){blobCache.set(a.id,file);s.att=a;}
+  }
+  t.sources=[s].concat(t.sources||[]);
+  while(t.sources.length>6){const o=t.sources.pop();if(o.att)removeAttFiles(o.att);}
+  if(msalAccount){ /* also leave a readable copy next to the data file */
+    try{gPut(DATA_FOLDER+'/Itineraries/'+toISO(new Date())+'-'+safeName((s.name||'itinerary').replace(/\.[^.]+$/,''))+'.md',new Blob([text],{type:'text/markdown'}),'text/markdown');}catch(e){}
+  }
+  changed();sweepUploads();
 }
 function saveTrip(isNew){
   const name=$('#t_name').value.trim()||'Trip',start=$('#t_start').value,end=$('#t_end').value,region=$('#t_region').value.trim();
@@ -1640,7 +1704,8 @@ function repItems(tab){
   if(tab!=='stay'&&!repAll)its=its.filter(isBookable);
   if(tab==='food'&&repMeal)its=its.filter(i=>i.meal===repMeal);
   if(tab==='transport'&&repMode)its=its.filter(i=>(i.mode||'other')===repMode);
-  return its.sort((a,b)=>(a.date+(tab==='stay'?'':sortKey(a))).localeCompare(b.date+(tab==='stay'?'':sortKey(b))));
+  const om={};const ord=i=>{if(tab==='stay')return 0;const m=om[i.date]||(om[i.date]=dayOrder(i.date));return m.get(i.id)||0;};
+  return its.sort((a,b)=>a.date.localeCompare(b.date)||ord(a)-ord(b)||(tab==='stay'?(a.time||'').localeCompare(b.time||''):0));
 }
 function priceTotals(its){
   const tot={};
@@ -1727,6 +1792,12 @@ function onAct(el,e){
     case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
     case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
     case 'locate':locateAll();break;
+    case 'caltype':calTypes[el.dataset.type]=!calTypes[el.dataset.type];try{localStorage.setItem('travel-mgr-caltypes-v1',JSON.stringify(calTypes));}catch(x){}renderAll();break;
+    case 'calall':{const all=TYPES.every(ty=>calTypes[ty.id]);TYPES.forEach(ty=>calTypes[ty.id]=!all);try{localStorage.setItem('travel-mgr-caltypes-v1',JSON.stringify(calTypes));}catch(x){}renderAll();break;}
+    case 'srcopen':srcOpen(el.dataset.id);break;
+    case 'srctext':srcText(el.dataset.id);break;
+    case 'srcdl':srcDownload(el.dataset.id);break;
+    case 'srcdel':srcRemove(el.dataset.id);break;
     case 'reptab':repTab=el.dataset.tab;renderAll();break;
     case 'repcsv':repCsv();break;
     case 'repprint':window.print();break;
@@ -1738,7 +1809,7 @@ function onAct(el,e){
     case 'saveitem':saveItem();break;
     case 'delitem':deleteItem();break;
     case 'impPreview':runImportPreview();break;
-    case 'impBack':openImport();break;
+    case 'impBack':openImport(true);break;
     case 'impApply':doImport();break;
     case 'savetrip':saveTrip(el.dataset.new==='1');break;
     case 'deltrip':{
@@ -1779,7 +1850,7 @@ document.addEventListener('change',e=>{
   if(t.id==='rep_mode'){repMode=t.value;renderAll();}
   if(t.id==='rep_all'){repAll=t.checked;renderAll();}
   if(t.id==='i_file'&&t.files[0]){
-    const f=t.files[0];
+    const f=t.files[0];imp.file=f;
     if(/\.pdf$/i.test(f.name)||f.type==='application/pdf'){
       const ta=$('#i_text');ta.value='Reading the PDF…';
       pdfFileToText(f).then(txt=>{ta.value=txt;toast('PDF read. Check the text below, then press Preview.');})
@@ -1820,7 +1891,7 @@ document.addEventListener('drop',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&msalAccount&&!ed)syncFromOneDrive();});
 
 /* ============ START ============ */
-window.__travel={geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
+window.__travel={srcById,attBlob,trip,geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
 (async function init(){
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
