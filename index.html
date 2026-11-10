@@ -174,7 +174,7 @@ dialog .toast{top:14px;bottom:auto}
 .bk{display:inline-block;font-size:11px;font-weight:650;padding:0 8px;border-radius:999px;border:1px solid var(--line);margin-left:6px;color:var(--ink);white-space:nowrap}
 .rep-head .bk,.rep-bar .bk{margin-left:0;margin-right:6px}
 .bk-confirmed{background:#2e7d4f33;border-color:#2e7d4f88}.bk-tobook{background:#b3261e2e;border-color:#b3261e88}.bk-optional{background:#b26a0030;border-color:#b26a0088}.bk-included{background:#2b6cb030;border-color:#2b6cb088}
-.notes-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.notes-h input{flex:1;min-width:160px;max-width:340px}.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}.note .nh{display:flex;gap:10px;align-items:center}.note .nh h3{margin:0;font-size:16px;flex:1}.note .nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:8px 0}.note .atts{margin-top:8px}#n_body{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
+.notes-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.notes-h input{flex:1;min-width:160px;max-width:340px}.nlist{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}.nrow{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;padding:11px 14px;cursor:pointer}.nrow:last-child{border-bottom:0}.nrow:hover{background:var(--wk)}.nrow .nt{flex:1;font-weight:600;min-width:0;overflow-wrap:anywhere}.nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:0 0 10px}.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}.note .nh{display:flex;gap:10px;align-items:center}.note .nh h3{margin:0;font-size:16px;flex:1}.note .nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:8px 0}.note .atts{margin-top:8px}#n_body{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
 .rep-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .rep-bar .sp{flex:1}.chk{font-size:13px;display:flex;gap:5px;align-items:center}
 .rep-bar .seg button .n{font-size:11px;opacity:.7;margin-left:3px}
@@ -240,7 +240,7 @@ const TYPES=[
   {id:'other',label:'Other',add:'Other',icon:'tag'}
 ];
 const TYPE_BY_ID=Object.fromEntries(TYPES.map(t=>[t.id,t]));
-const MODES=[['train','Train / metro'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
+const MODES=[['train','Train'],['subway','Subway'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
 const MEALS=[['','—'],['breakfast','Breakfast'],['lunch','Lunch'],['dinner','Dinner'],['snack','Snack / drink']];
 const IMPORT_FIELDS=['title','date','endDate','time','endTime','slot','place','from','to','mode','meal','bk','ref','price','how','svc','bkNote'];
 const ICONS={
@@ -248,6 +248,7 @@ const ICONS={
   bed:'<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
   food:'<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
   star:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  subway:'<rect x="5" y="3" width="14" height="15" rx="4"/><path d="M5 11h14M9 21l1.5-3M15 21l-1.5-3M9 14.5h.01M15 14.5h.01M9 7h6"/>',
   train:'<rect x="4" y="3" width="16" height="16" rx="2"/><path d="M4 11h16M12 3v8M8 19l-2 3M18 22l-2-3M8 15h.01M16 15h.01"/>',
   flight:'<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
   bus:'<path d="M8 6v6M15 6v6M2 12h19.6M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/>',
@@ -535,7 +536,8 @@ const EMOJI_LEAD=/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F
 function emojiHint(e){
   if(/[🏨🛏🏩🛌🏠🏡⛺]/u.test(e))return {type:'stay'};
   if(/[🍜🍣🍱🍽🥢🍺🍵☕🍙🍛🍢🍕🍔🥐🍰🍷🍶🥘🍲🍡🍤]/u.test(e))return {type:'food'};
-  if(/[🚆🚄🚅🚇🚊🚝🚈]/u.test(e))return {type:'transport',mode:'train'};
+  if(/[🚇]/u.test(e))return {type:'transport',mode:'subway'};
+  if(/[🚆🚄🚅🚊🚝🚈]/u.test(e))return {type:'transport',mode:'train'};
   if(/[✈🛫🛬]/u.test(e))return {type:'transport',mode:'flight'};
   if(/[🚌🚎]/u.test(e))return {type:'transport',mode:'bus'};
   if(/[🚕🚗🚖🚙]/u.test(e))return {type:'transport',mode:'car'};
@@ -546,6 +548,7 @@ function emojiHint(e){
 function modeOf(s){
   s=String(s).toLowerCase();
   if(/\b(flight|fly|flies|flying|airline|jetstar|qantas|virgin|ana|jal|peach|airways|airlines)\b/.test(s))return 'flight';
+  if(/\b(metro|subway|underground|tube)\b/.test(s)&&!/\b(shinkansen|bullet|jr|express|limited express)\b/.test(s))return 'subway';
   if(/\b(shinkansen|bullet|train|jr|rail|railway|express|metro|subway|monorail|tram|line|nozomi|hikari|sakura|kodama|limited express|romancecar|skyliner|n'ex|haruka)\b/.test(s))return 'train';
   if(/\b(bus|coach|shuttle)\b/.test(s))return 'bus';
   if(/\b(taxi|cab|uber|drive|driving|car|rental|hire)\b/.test(s))return 'car';
@@ -697,7 +700,7 @@ function parseItinerary(text,opts){
       if(/accomm|accomo|hotel|lodging|stay|check/.test(label))type='stay';
       else if(/food|meal|dining|breakfast|brunch|lunch|dinner|supper|snack/.test(label)){type='food';if(/breakfast|brunch|lunch|dinner|supper|snack/.test(label))meal=label==='brunch'?'breakfast':label==='supper'?'dinner':label;}
       else if(/activit|sightseeing/.test(label))type='activity';
-      else{type='transport';mode={train:'train',shinkansen:'train',flight:'flight',bus:'bus',taxi:'car',ferry:'ferry',drive:'car'}[label]||'';}
+      else{type='transport';mode={train:'train',metro:'subway',subway:'subway',shinkansen:'train',flight:'flight',bus:'bus',taxi:'car',ferry:'ferry',drive:'car'}[label]||'';}
     }
     if(!type&&secIn)type=(secIn==='activity'&&/^\W*(breakfast|brunch|lunch|dinner|supper)\b/i.test(head))?'food':secIn;
     if(!type&&hint)type=hint.type;
@@ -1795,19 +1798,23 @@ function renderNotes(){
   const q=noteQ.trim().toLowerCase();
   const all=(data.notes||[]).slice().sort((a,b)=>(a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base'}));
   const list=q?all.filter(n=>((n.title||'')+' '+(n.body||'')).toLowerCase().includes(q)):all;
-  const cards=list.map(n=>{
-    const files=(n.atts||[]);
-    const imgs=files.filter(a=>/^image\//.test(a.type)),other=files.filter(a=>!/^image\//.test(a.type));
-    return '<article class="note" data-id="'+esc(n.id)+'"><div class="nh"><h3>'+esc(n.title||'Untitled')+'</h3><span class="hint">'+(n.updated?esc(new Date(n.updated).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})):'')+'</span><button class="btn" data-act="noteedit" data-id="'+esc(n.id)+'">Edit</button></div>'+
-      (noteSnippet(n.body)?'<div class="nb">'+esc(n.body)+'</div>':'')+
-      (imgs.length?'<div class="atts">'+imgs.map(a=>'<div class="att" data-id="'+esc(a.id)+'"><img alt="'+esc(a.name)+'" hidden data-act="openatt" data-id="'+esc(a.id)+'"></div>').join('')+'</div>':'')+
-      (other.length?'<div class="atts">'+other.map(a=>'<div class="att"><div class="fn" data-act="openatt" data-id="'+esc(a.id)+'">'+ico('clip')+' '+esc(a.name)+'<small>'+fmtSize(a.size||0)+'</small></div></div>').join('')+'</div>':'')+'</article>';
-  }).join('');
+  const rows=list.map(n=>'<button type="button" class="nrow" data-act="noteview" data-id="'+esc(n.id)+'"><span class="nt">'+ico('note')+' '+esc(n.title||'Untitled')+'</span>'+((n.atts||[]).length?'<span class="hint">'+ico('clip')+(n.atts||[]).length+'</span>':'')+'<span class="hint">'+(n.updated?esc(new Date(n.updated).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})):'')+'</span></button>').join('');
   $('#main').innerHTML='<div class="notes-h"><input id="note_q" type="search" placeholder="Search notes…" value="'+esc(noteQ)+'" aria-label="Search notes"><span class="sp"></span><span class="hint">'+list.length+(q?' of '+all.length:'')+' note'+(all.length===1?'':'s')+'</span><button class="btn primary" data-act="notenew">+ New note</button></div>'+
-    (cards||'<div class="empty"><p>'+(all.length?'No notes match that search.':'No notes yet. Use <b>+ New note</b> for things like “how to load an IC card on an iPhone”. You can paste screenshots into a note.')+'</p></div>')+'<div class="notes-list" hidden></div>';
-  list.forEach(n=>(n.atts||[]).filter(a=>/^image\//.test(a.type)).forEach(a=>{
-    attBlob(a).then(b=>{const im=$('.note[data-id="'+n.id+'"] .att[data-id="'+a.id+'"] img');if(!im)return;if(b){im.src=URL.createObjectURL(b);im.hidden=false;}else im.closest('.att').innerHTML='<div class="fn">'+esc(a.name)+'<small>not on this device'+(msalAccount?'':' — sign in to fetch from OneDrive')+'</small></div>';});
-  }));
+    (rows?'<div class="nlist">'+rows+'</div>':'<div class="empty"><p>'+(all.length?'No notes match that search.':'No notes yet. Use <b>+ New note</b> for things like “how to load an IC card on an iPhone”. You can paste screenshots into a note.')+'</p></div>');
+}
+let nvUrls=[];
+function openNoteView(id){
+  const n=(data.notes||[]).find(x=>x.id===id);if(!n)return;
+  const imgs=n.atts.filter(a=>/^image\//.test(a.type)),other=n.atts.filter(a=>!/^image\//.test(a.type));
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('note')+'<span>'+esc(n.title||'Untitled')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    (n.body&&n.body.trim()?'<div class="nb">'+esc(n.body)+'</div>':'<div class="hint">No text in this note.</div>')+
+    (imgs.length?'<div class="atts">'+imgs.map(a=>'<div class="att" data-id="'+esc(a.id)+'"><img alt="'+esc(a.name)+'" hidden data-act="openatt" data-id="'+esc(a.id)+'"></div>').join('')+'</div>':'')+
+    (other.length?'<div class="atts">'+other.map(a=>'<div class="att"><div class="fn" data-act="openatt" data-id="'+esc(a.id)+'">'+ico('clip')+' '+esc(a.name)+'<small>'+fmtSize(a.size||0)+'</small></div></div>').join('')+'</div>':'')+
+    '</div><div class="df"><button class="btn" data-act="dclose">Close</button><button class="btn primary" data-act="noteedit" data-id="'+esc(n.id)+'">Edit</button></div></div>';
+  dlg.onclose=()=>{nvUrls.forEach(u=>URL.revokeObjectURL(u));nvUrls=[];};
+  if(!dlg.open)dlg.showModal();
+  imgs.forEach(a=>attBlob(a).then(b=>{const im=$('.att[data-id="'+a.id+'"]',dlg);if(!im)return;if(b){const u=URL.createObjectURL(b);nvUrls.push(u);const i=$('img',im);i.src=u;i.hidden=false;}else im.innerHTML='<div class="fn">'+esc(a.name)+'<small>not on this device'+(msalAccount?'':' — sign in to fetch from OneDrive')+'</small></div>';}));
 }
 function openNote(id){
   const orig=id?(data.notes||[]).find(n=>n.id===id):null;
@@ -1819,7 +1826,7 @@ function openNote(id){
     fld('Content','<textarea id="n_body" style="min-height:240px" placeholder="Write the steps, details or reminders here">'+esc(draft.body)+'</textarea>')+
     '<div class="blk" data-zone="file"><h4>'+ico('clip')+'Screenshots &amp; files</h4><div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop images or files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="notedel">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="notesave">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
-  dlg.onclose=cleanupEd;dlg.showModal();renderAtts();
+  dlg.onclose=cleanupEd;if(!dlg.open)dlg.showModal();renderAtts();
   setTimeout(()=>{const t=$('#n_title');if(t&&ed&&ed.isNew)t.focus();},50);
 }
 function readNote(){
@@ -1889,6 +1896,7 @@ function onAct(el,e){
     case 'pickfile':pickFiles(el.dataset.zone);break;
     case 'rmatt':{const id=el.dataset.id,i=ed.draft.atts.findIndex(a=>a.id===id);if(i>=0){const a=ed.draft.atts.splice(i,1)[0];if(ed.newAtts.has(id)){ed.newAtts.delete(id);removeAttFiles(a);}else ed.removed.push(a);readAny();renderAtts();}break;}
     case 'openatt':openAtt(el.dataset.id);break;
+    case 'noteview':openNoteView(el.dataset.id);break;
     case 'notenew':openNote();break;
     case 'noteedit':openNote(el.dataset.id);break;
     case 'notesave':saveNote();break;
