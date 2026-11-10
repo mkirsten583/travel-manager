@@ -302,6 +302,7 @@ const msalConfigured=()=>{const c=clientId();return !!c&&!/PASTE/i.test(c);};
 function normalise(o){
   o=(o&&typeof o==='object')?o:{};
   const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],notes:Array.isArray(o.notes)?o.notes:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
+  for(const k of Object.keys(d.geo))if(!d.geo[k])delete d.geo[k];
   for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];}
   for(const n of d.notes){n.id=n.id||uid();n.title=n.title||'';n.body=n.body||'';n.atts=Array.isArray(n.atts)?n.atts:[];}
   for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
@@ -1204,31 +1205,63 @@ function applyImport(plan,parsed,o){
 /* ============ GEOCODING & MAPS ============ */
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const geoQueue=[];let geoBusy=false;
+let geoNetErr=false;
 function geocode(q){
   q=String(q||'').trim();if(!q)return Promise.resolve(null);
-  const key=norm(q);if(data.geo[key]!==undefined)return Promise.resolve(data.geo[key]);
+  const key=norm(q);if(data.geo[key])return Promise.resolve(data.geo[key]);
   return new Promise(res=>{geoQueue.push({q,key,res});pumpGeo();});
 }
 async function pumpGeo(){
   if(geoBusy)return;geoBusy=true;
   while(geoQueue.length){
     const j=geoQueue.shift();
-    if(data.geo[j.key]!==undefined){j.res(data.geo[j.key]);continue;}
-    let v,ok=false;
+    if(data.geo[j.key]){j.res(data.geo[j.key]);continue;}
+    let v=null,ok=false;
     try{
       const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=en&q='+encodeURIComponent(j.q));
-      if(r.ok){const a=await r.json();v=a[0]?{lat:+a[0].lat,lng:+a[0].lon}:null;ok=true;}
+      if(r.ok){const a=await r.json();ok=true;if(a[0])v={lat:+a[0].lat,lng:+a[0].lon};}
     }catch(e){}
-    if(!ok){ /* Nominatim refused (e.g. page opened from a file) – try Photon, which has no referrer rule */
+    if(!v){ /* Nominatim refused or found nothing – try Photon (different data, no referrer rule) */
       try{
         const r=await fetch('https://photon.komoot.io/api/?limit=1&lang=en&q='+encodeURIComponent(j.q));
-        if(r.ok){const a=await r.json(),f=a.features&&a.features[0];v=f?{lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0]}:null;ok=true;}
+        if(r.ok){const a=await r.json(),f=a.features&&a.features[0];ok=true;if(f)v={lat:f.geometry.coordinates[1],lng:f.geometry.coordinates[0]};}
       }catch(e){}
     }
-    if(ok){data.geo[j.key]=v;j.res(v);}else j.res(null);
+    if(v)data.geo[j.key]=v; /* misses are not remembered, so a better search can retry */
+    if(!ok)geoNetErr=true;
+    j.res(v);
     await sleep(1100);
   }
   geoBusy=false;
+}
+/* Hotel and venue names are often long ("HOTEL GROOVE SHINJUKU, A PARKROYAL Hotel"), which search engines miss. Try several simpler queries. */
+const geoClean=t=>String(t||'').replace(/\([^)]*\)/g,' ').replace(/\s+[-–—]\s+.*$/,'').replace(/,\s*(?:a|an|part of|by)\s+.*$/i,'').replace(/\b(?:a|an)\s+[\w&' ]+\s+(?:hotel|hotels|resort|collection)\s*$/i,'').replace(/^(?:check-?in|check-?out|dinner|lunch|breakfast)\s*:\s*/i,'').replace(/\s+/g,' ').trim();
+function geoCands(it,which){
+  const reg=(trip()&&trip().region)||'';
+  const add=(arr,base,city)=>{if(base)arr.push([base,city,reg].filter(Boolean).join(', '));};
+  const out=[];
+  if(which==='from'||which==='to'){
+    const base=geoQ(it,which).replace(new RegExp(',\\s*'+reg.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'),'');
+    out.push(geoQ(it,which));
+    if(geoClean(base)&&geoClean(base)!==base)add(out,geoClean(base));
+    add(out,base.replace(/\b(station|eki)\b/i,'').trim()+' station');
+  }else{
+    const nm=geoClean(it.title),city=it.place&&norm(it.place)!==norm(it.title)?it.place:'';
+    if(it.type==='stay'||it.type==='activity'||it.type==='food'||it.type==='other'){
+      add(out,nm,city);
+      add(out,nm);
+      if(it.address)add(out,it.address);
+      if(it.address&&city)add(out,it.address,city);
+      add(out,city);
+    }
+    const raw=geoQ(it,'place');if(raw)out.push(raw);
+  }
+  return [...new Set(out.filter(Boolean))].slice(0,5);
+}
+async function geoFind(it,which){
+  geoNetErr=false;
+  for(const q of geoCands(it,which)){const v=await geocode(q);if(v)return v;}
+  return null;
 }
 function geoQ(it,which){
   const reg=(trip()&&trip().region)||'';
@@ -1405,7 +1438,7 @@ async function locateAll(){
   let ok=0;
   for(let i=0;i<jobs.length;i++){
     const [it,w]=jobs[i];toast('Finding places… '+(i+1)+' of '+jobs.length);
-    const v=await geocode(geoQ(it,w));
+    const v=await geoFind(it,w);
     if(v){if(w==='from')it.fromCoord=v;else if(w==='to')it.toCoord=v;else it.coord=v;ok++;}
   }
   changed();toast('Located '+ok+' of '+jobs.length+' places. Drag pins in an item to fix any that are wrong.');
@@ -1443,13 +1476,14 @@ function openItem(id,type,date){
 function renderItemDialog(first){
   if(edMap){edMap.remove();edMap=null;}
   const d=ed.draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
+  const rail=tr&&(d.mode==='train'||d.mode==='subway');
   const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',other:'Item / event',transport:'Service / description'}[d.type];
   let f=fld('Type','<select id="f_type">'+TYPES.map(x=>'<option value="'+x.id+'"'+(x.id===d.type?' selected':'')+'>'+x.label+'</option>').join('')+'</select>')+fld(titleLbl,inp('f_title',d.title));
   if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='activity'||d.type==='other')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld(d.type==='other'?'Reference':'Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
-  else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld('Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
-  const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld('Price',inp('f_price',d.price,'text','e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+'</div>';
+  else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld(rail?'Service':'Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+'</div>';
   const dlg=$('#dlg');
   dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+bkBlk+
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
@@ -1547,9 +1581,9 @@ async function findOnMap(){
   const jobs=d.type==='transport'?[['from',geoQ(d,'from')],['to',geoQ(d,'to')]]:[['place',geoQ(d,'place')]];
   if(!jobs.some(j=>j[1])){toast(d.type==='transport'?'Enter a From and To first.':'Enter a place, address or title first.');return;}
   if(btn)btn.disabled=true;let bad=0;
-  for(const [w,q] of jobs){if(!q)continue;const v=await geocode(q);if(!ed)return;if(v){if(w==='from')d.fromCoord=v;else if(w==='to')d.toCoord=v;else d.coord=v;d.coordManual=false;}else bad++;}
+  for(const [w,q] of jobs){if(!q)continue;const v=await geoFind(d,w);if(!ed)return;if(v){if(w==='from')d.fromCoord=v;else if(w==='to')d.toCoord=v;else d.coord=v;d.coordManual=false;}else bad++;}
   if(btn)btn.disabled=false;
-  if(bad)toast('Could not find '+(bad>1?'those places':'that place')+'. Try a more specific name, or paste a map link or image.');
+  if(bad)toast(geoNetErr?'The map search service could not be reached from this page (blocked or offline). Paste a map link or image instead, or try again later.':'Could not find '+(bad>1?'those places':'that place')+'. Try a more specific name, or paste a map link or image.');
   mountEdMap();
 }
 function saveItem(){
@@ -1729,7 +1763,7 @@ const REP={
     ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote],['Notes',i=>trunc(i.notes,160)]]},
   transport:{label:'Transport',cols:[
     ['Date',i=>fmtShort(i.date)],['Depart',i=>i.time],['Arrive',i=>i.endTime],['Journey',i=>(i.from||i.to)?i.from+' → '+i.to:i.title],['Mode',i=>modeLabel(i.mode)],['Service',i=>i.svc],
-    ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote]]}
+    ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price / booking no.',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote]]}
 };
 function repItems(tab){
   let its=tripItems().filter(i=>i.type===tab);
@@ -1942,6 +1976,7 @@ document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
   if(t.id==='f_type'){changeType(t.value);return;}
+  if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
   if(t.id==='rep_mode'){repMode=t.value;renderAll();}
   if(t.id==='map_tags'){mapTags=t.checked;try{localStorage.setItem('travel-mgr-maptags-v1',mapTags?'1':'0');}catch(x){}drawBigMap();}
@@ -1993,7 +2028,7 @@ document.addEventListener('drop',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&msalAccount&&!ed)syncFromOneDrive();});
 
 /* ============ START ============ */
-window.__travel={openNote,renderNotes,srcById,attBlob,trip,geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
+window.__travel={geoCands,geoFind,geoClean,openNote,renderNotes,srcById,attBlob,trip,geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
 (async function init(){
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
