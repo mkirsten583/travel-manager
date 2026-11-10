@@ -1261,16 +1261,30 @@ function geoCands(it,which){
       for(const c of cities)add(out,base,c);
       add(out,base);
     }
-    if(it.address)add(out,it.address);
+    if(it.address){add(out,it.address);const sa=it.address.replace(/\b\d+\s*Chome[-\d]*/gi,'').replace(/〒?\d{3}-?\d{4}/g,'').replace(/\b\d{3}-\d{1,4}\b/g,'').replace(/\s*,\s*,/g,',').replace(/^[\s,-]+|[\s,-]+$/g,'').trim();if(sa&&sa!==it.address)add(out,sa);}
     cities.forEach(c=>{out.push([c,reg].filter(Boolean).join(', '));if(!geoApproxQ)geoApproxQ=new Set();geoApproxQ.add([c,reg].filter(Boolean).join(', '));});
     const raw=geoQ(it,'place');if(raw)out.push(raw);
+    if(it.address&&/\d/.test(it.address)){const first=out.filter(q=>norm(q).includes(norm(it.address).slice(0,12)));out.splice(0,0,...first);} /* a street address with numbers is more exact than a name */
   }
   return [...new Set(out.filter(Boolean))].slice(0,10);
 }
+const kmBetween=(a,b)=>{const R=6371,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dg=r(b.lng-a.lng),h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));};
 async function geoFind(it,which){
   geoNetErr=false;geoApproxQ=new Set();
-  const cs=geoCands(it,which);
-  for(const q of cs){const v=await geocode(q);if(v){if(geoApproxQ.has(q))geoApprox=true;return v;}}
+  const cs=geoCands(it,which),cityQs=[...geoApproxQ];
+  /* Anchor: the day's hotel if it is already pinned, otherwise the first city we know. Results far from it are wrong matches (e.g. a same-named place in another prefecture). */
+  let anchor=null;
+  const st=itemsOnDay(it.date,'stay').find(s=>s.id!==it.id&&s.coord);
+  if(st)anchor=st.coord;
+  else if(cityQs.length){anchor=await geocode(cityQs[0]);}
+  for(const q of cs){
+    const v=await geocode(q);
+    if(!v)continue;
+    const isCity=geoApproxQ.has(q);
+    if(!isCity&&anchor&&kmBetween(anchor,v)>200){delete data.geo[norm(q)];continue;}
+    if(isCity)geoApprox=true;
+    return v;
+  }
   return null;
 }
 function geoQ(it,which){
@@ -1370,10 +1384,11 @@ function renderDay(){
 }
 let calTypes={stay:true,food:true,activity:true,transport:true,other:true};
 try{const s=JSON.parse(localStorage.getItem('travel-mgr-caltypes-v1')||'null');if(s&&typeof s==='object')for(const k of Object.keys(calTypes))if(typeof s[k]==='boolean')calTypes[k]=s[k];}catch(e){}
-function calFilterHtml(){
-  const on=TYPES.filter(ty=>calTypes[ty.id]).length;
-  return '<div class="calfilt nop"><span class="hint">Show:</span>'+TYPES.map(ty=>'<button class="fchip k-'+ty.id+(calTypes[ty.id]?' on':'')+'" data-act="caltype" data-type="'+ty.id+'" aria-pressed="'+!!calTypes[ty.id]+'">'+ico(ty.icon)+ty.label+'</button>').join('')+
-    '<button class="linkbtn" data-act="calall">'+(on===TYPES.length?'Clear all':'Show all')+'</button></div>';
+function calFilterHtml(st,pre){
+  st=st||calTypes;pre=pre||'cal';
+  const on=TYPES.filter(ty=>st[ty.id]).length;
+  return '<div class="calfilt nop"><span class="hint">Show:</span>'+TYPES.map(ty=>'<button class="fchip k-'+ty.id+(st[ty.id]?' on':'')+'" data-act="'+pre+'type" data-type="'+ty.id+'" aria-pressed="'+!!st[ty.id]+'">'+ico(ty.icon)+ty.label+'</button>').join('')+
+    '<button class="linkbtn" data-act="'+pre+'all">'+(on===TYPES.length?'Clear all':'Show all')+'</button></div>';
 }
 function renderCal(){
   const t=trip(),r=tripRange(t);
@@ -1410,11 +1425,13 @@ function renderAgenda(){
 let bigMap=null;
 function renderMapView(){
   const t=trip(),days=tripDays(t);
-  $('#main').innerHTML='<div class="row1" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><select id="mapDay" class="btn" style="padding:6px 8px"><option value="">All days</option>'+days.map((d,i)=>'<option value="'+d+'"'+(d===mapDayFilter?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select><button class="btn" data-act="locate">Find places on map</button><label class="chk"><input type="checkbox" id="map_tags" '+(mapTags?'checked':'')+'> Day / start-time tags</label><span class="hint" id="mapStat"></span></div><div id="bigmap"></div><div class="mapnote">Place pins are looked up from the item’s place, address or title (plus the trip’s place hint). Open an item and drag its pin if a spot is wrong. Transport legs are drawn between their From and To points.</div>';
+  $('#main').innerHTML='<div class="row1" style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><select id="mapDay" class="btn" style="padding:6px 8px"><option value="">All days</option>'+days.map((d,i)=>'<option value="'+d+'"'+(d===mapDayFilter?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select><label class="chk"><input type="checkbox" id="map_tags" '+(mapTags?'checked':'')+'> Day / start-time tags</label><span class="hint" id="mapStat"></span></div>'+calFilterHtml(mapTypes,'map')+'<div id="bigmap"></div><div class="mapnote">Place pins are looked up from the item’s place, address or title (plus the trip’s place hint). Open an item and drag its pin if a spot is wrong. Transport legs are drawn between their From and To points.</div>';
   $('#mapDay').onchange=e=>{mapDayFilter=e.target.value;drawBigMap();};
   drawBigMap();
 }
 let mapDayFilter='';
+let mapTypes={stay:true,food:true,activity:true,transport:true,other:true};
+try{const s=JSON.parse(localStorage.getItem('travel-mgr-maptypes-v1')||'null');if(s&&typeof s==='object')for(const k of Object.keys(mapTypes))if(typeof s[k]==='boolean')mapTypes[k]=s[k];}catch(e){}
 async function drawBigMap(){
   const el=$('#bigmap');if(!el)return;
   if(!hasL()){el.innerHTML='<div class="empty" style="margin:20px">The map library could not load (offline?). Maps need an internet connection.</div>';return;}
@@ -1424,7 +1441,7 @@ async function drawBigMap(){
   const stays=tripItems().filter(i=>i.type==='stay');
   const sleeps=(s,d)=>s.date<=d&&d<(s.endDate||addDays(s.date,1));
   const stayOn=(s,d)=>sleeps(s,d)||((s.endDate||addDays(s.date,1))===d&&!stays.some(o=>o.id!==s.id&&sleeps(o,d)));
-  const its=tripItems().filter(i=>!mapDayFilter||(i.type==='stay'?stayOn(i,mapDayFilter):i.date===mapDayFilter));
+  const its=tripItems().filter(i=>mapTypes[i.type]!==false).filter(i=>!mapDayFilter||(i.type==='stay'?stayOn(i,mapDayFilter):i.date===mapDayFilter));
   for(const it of its){
     if(it.type==='transport'){
       if(it.fromCoord&&it.toCoord){
@@ -1503,6 +1520,7 @@ function renderItemDialog(first){
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><button type="button" class="btn" data-act="clearmap" title="Remove the map link and the pin for this item">Remove link &amp; pin</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
+    '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From coordinates (latitude, longitude)',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To coordinates (latitude, longitude)',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div><div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
     '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+
     '<div class="drop" tabindex="0" data-zone="map" id="dropMap">Paste or drop a map image here (e.g. a screenshot of Google Maps) or <button type="button" class="linkbtn" data-act="pickfile" data-zone="map">choose an image</button></div><div class="atts" id="attsMap"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="delitem">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="saveitem">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
@@ -1580,7 +1598,7 @@ async function mountEdMap(){
   const pts=[];
   const mk=(c,which,label)=>{
     const mm=L.marker([c.lat,c.lng],{draggable:true,icon:pinIcon(d.type,label)}).addTo(m);
-    mm.on('dragend',()=>{const p=mm.getLatLng();const v={lat:p.lat,lng:p.lng};if(which==='from')d.fromCoord=v;else if(which==='to')d.toCoord=v;else d.coord=v;d.coordManual=true;if(d.type==='transport')mountEdMap();});
+    mm.on('dragend',()=>{const p=mm.getLatLng();const v={lat:p.lat,lng:p.lng};if(which==='from')d.fromCoord=v;else if(which==='to')d.toCoord=v;else d.coord=v;d.coordManual=true;syncLL();if(d.type==='transport')mountEdMap();});
     pts.push([c.lat,c.lng]);
   };
   if(d.type==='transport'){
@@ -1590,12 +1608,33 @@ async function mountEdMap(){
   if(pts.length)m.fitBounds(pts,{padding:[30,30],maxZoom:15});
   setTimeout(()=>{if(edMap===m)m.invalidateSize();},120);
 }
+const fmtLL=c=>c&&isFinite(c.lat)&&isFinite(c.lng)?(+c.lat).toFixed(6)+', '+(+c.lng).toFixed(6):'';
+function parseLL(s){
+  s=String(s||'').trim();if(!s)return null;
+  const g=s.match(/@?\s*(-?\d+(?:\.\d+)?)\s*°?\s*([NSns])?\s*[,;\s]\s*(-?\d+(?:\.\d+)?)\s*°?\s*([EWew])?/);
+  if(!g)return undefined;
+  let lat=+g[1],lng=+g[3];if(/s/i.test(g[2]||''))lat=-Math.abs(lat);if(/w/i.test(g[4]||''))lng=-Math.abs(lng);
+  if(Math.abs(lat)>90||Math.abs(lng)>180)return undefined;
+  return {lat,lng};
+}
+function syncLL(){
+  if(!ed||ed.kind==='note')return;const d=ed.draft,set=(id,c)=>{const e=$('#'+id);if(e&&document.activeElement!==e)e.value=fmtLL(c);};
+  set('f_ll',d.coord);set('f_llfrom',d.fromCoord);set('f_llto',d.toCoord);
+}
+function applyLL(id){
+  const e=$('#'+id);if(!e||!ed)return;const d=ed.draft,v=parseLL(e.value);
+  const key=id==='f_llfrom'?'fromCoord':id==='f_llto'?'toCoord':'coord';
+  if(v===undefined){toast('Could not read those coordinates. Use latitude, longitude — for example 36.2381, 137.9720.');return;}
+  d[key]=v;if(v)d.coordManual=true;
+  e.value=fmtLL(v);mountEdMap();
+  toast(v?'Pin set from coordinates — press Save to keep it.':'Pin removed — press Save to keep that.');
+}
 function clearMapLoc(){
   readForm();const d=ed.draft;
   d.mapLink='';d.coord=null;d.fromCoord=null;d.toCoord=null;d.coordManual=false;
   ed.q0={place:geoQ(d,'place'),from:geoQ(d,'from'),to:geoQ(d,'to')};
   const f=$('#f_maplink');if(f)f.value='';
-  updateGm();mountEdMap();toast('Map link and pin removed — press Save to keep that.');
+  updateGm();syncLL();mountEdMap();toast('Map link and pin removed — press Save to keep that.');
 }
 async function findOnMap(){
   readForm();const d=ed.draft;const btn=$('[data-act=findmap]');
@@ -1605,7 +1644,7 @@ async function findOnMap(){
   for(const [w,q] of jobs){if(!q)continue;const v=await geoFind(d,w);if(!ed)return;if(v){if(w==='from')d.fromCoord=v;else if(w==='to')d.toCoord=v;else d.coord=v;d.coordManual=false;}else bad++;}
   if(btn)btn.disabled=false;
   if(bad)toast(geoNetErr?'The map search service could not be reached from this page (blocked or offline). Paste a map link or image instead, or try again later.':'Could not find '+(bad>1?'those places':'that place')+'. Try a more specific name, or paste a map link or image.');
-  mountEdMap();
+  syncLL();mountEdMap();
   if(geoApprox&&!bad)toast('Could not find that exact place, so the pin is at the city centre. Drag the pin to the right spot, or paste a map link or image.');
 }
 function saveItem(){
@@ -1939,6 +1978,8 @@ function onAct(el,e){
     case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
     case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
     case 'locate':locateAll();break;
+    case 'maptype':mapTypes[el.dataset.type]=!mapTypes[el.dataset.type];try{localStorage.setItem('travel-mgr-maptypes-v1',JSON.stringify(mapTypes));}catch(x){}renderAll();break;
+    case 'mapall':{const all=TYPES.every(ty=>mapTypes[ty.id]);TYPES.forEach(ty=>mapTypes[ty.id]=!all);try{localStorage.setItem('travel-mgr-maptypes-v1',JSON.stringify(mapTypes));}catch(x){}renderAll();break;}
     case 'caltype':calTypes[el.dataset.type]=!calTypes[el.dataset.type];try{localStorage.setItem('travel-mgr-caltypes-v1',JSON.stringify(calTypes));}catch(x){}renderAll();break;
     case 'calall':{const all=TYPES.every(ty=>calTypes[ty.id]);TYPES.forEach(ty=>calTypes[ty.id]=!all);try{localStorage.setItem('travel-mgr-caltypes-v1',JSON.stringify(calTypes));}catch(x){}renderAll();break;}
     case 'srcopen':srcOpen(el.dataset.id);break;
@@ -1998,6 +2039,7 @@ $('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
+  if(/^f_ll(from|to)?$/.test(t.id)){applyLL(t.id);return;}
   if(t.id==='f_type'){changeType(t.value);return;}
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
