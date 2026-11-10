@@ -174,7 +174,7 @@ dialog .toast{top:14px;bottom:auto}
 .bk{display:inline-block;font-size:11px;font-weight:650;padding:0 8px;border-radius:999px;border:1px solid var(--line);margin-left:6px;color:var(--ink);white-space:nowrap}
 .rep-head .bk,.rep-bar .bk{margin-left:0;margin-right:6px}
 .bk-confirmed{background:#2e7d4f33;border-color:#2e7d4f88}.bk-tobook{background:#b3261e2e;border-color:#b3261e88}.bk-optional{background:#b26a0030;border-color:#b26a0088}.bk-included{background:#2b6cb030;border-color:#2b6cb088}
-.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
+.notes-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.notes-h input{flex:1;min-width:160px;max-width:340px}.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}.note .nh{display:flex;gap:10px;align-items:center}.note .nh h3{margin:0;font-size:16px;flex:1}.note .nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:8px 0}.note .atts{margin-top:8px}#n_body{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
 .rep-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .rep-bar .sp{flex:1}.chk{font-size:13px;display:flex;gap:5px;align-items:center}
 .rep-bar .seg button .n{font-size:11px;opacity:.7;margin-left:3px}
@@ -200,7 +200,7 @@ dialog .toast{top:14px;bottom:auto}
     <h1>Travel manager</h1>
     <select id="tripSel" aria-label="Trip"></select>
     <div class="seg" id="viewSeg">
-      <button data-view="day">Day</button><button data-view="cal">Calendar</button><button data-view="agenda">Agenda</button><button data-view="map">Map</button><button data-view="reports">Reports</button>
+      <button data-view="day">Day</button><button data-view="cal">Calendar</button><button data-view="agenda">Agenda</button><button data-view="map">Map</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
     </div>
     <span class="sp"></span>
     <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
@@ -290,7 +290,7 @@ function toast(msg){
 }
 
 /* ---------- state ---------- */
-let data={v:1,trips:[],items:[],geo:{}};
+let data={v:1,trips:[],items:[],notes:[],geo:{}};
 let selTrip=null, selDate=null, view='day';
 let lastText=null, dirty=false, writing=false, rev=0, saveTimer=null;
 let msalApp=null, msalAccount=null;
@@ -300,8 +300,9 @@ const msalConfigured=()=>{const c=clientId();return !!c&&!/PASTE/i.test(c);};
 
 function normalise(o){
   o=(o&&typeof o==='object')?o:{};
-  const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
+  const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],notes:Array.isArray(o.notes)?o.notes:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
   for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];}
+  for(const n of d.notes){n.id=n.id||uid();n.title=n.title||'';n.body=n.body||'';n.atts=Array.isArray(n.atts)?n.atts:[];}
   for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
   return d;
 }
@@ -494,6 +495,7 @@ async function sweepUploads(){
   try{
     let n=0;
     for(const it of data.items)for(const a of it.atts){if(!a.up&&await uploadAtt(a))n++;}
+    for(const nt of (data.notes||[]))for(const a of nt.atts){if(!a.up&&await uploadAtt(a))n++;}
     for(const tr of data.trips)for(const s of (tr.sources||[]))if(s.att&&!s.att.up&&await uploadAtt(s.att))n++;
     if(n){cacheLocal();rev++;clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveToOneDrive(),300);}
   }finally{sweeping=false;}
@@ -1408,7 +1410,8 @@ async function locateAll(){
 }
 function renderAll(){
   ensureSel();renderTripSel();renderViewSeg();
-  if(!trip()){$('#rail').innerHTML='';renderEmpty();}
+  if(view==='notes'){$('#rail').innerHTML='';if(bigMap){bigMap.remove();bigMap=null;}renderNotes();$('.layout').classList.add('rep');}
+  else if(!trip()){$('#rail').innerHTML='';renderEmpty();}
   else{
     renderRail();
     if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
@@ -1516,7 +1519,7 @@ async function addFiles(files,isMap){
       blobCache.set(a.id,f);ed.draft.atts.push(a);ed.newAtts.add(a.id);n++;
     }catch(err){toast('Could not add “'+(f.name||'file')+'”: '+(err&&err.message||err));}
   }
-  if(n){readForm();renderAtts();toast(n+(n>1?' files':' file')+' added — press Save to keep '+(n>1?'them':'it')+'.'+(moved?' (Non-image files went under Notes, screenshots & documents.)':''));}
+  if(n){readAny();renderAtts();toast(n+(n>1?' files':' file')+' added — press Save to keep '+(n>1?'them':'it')+'.'+(moved?' (Non-image files went under Notes, screenshots & documents.)':''));}
 }
 async function mountEdMap(){
   const el=$('#edMap');if(!el||!ed)return;
@@ -1784,6 +1787,61 @@ function repCsv(){
   const rows=[R.cols.map(c=>q(c[0])).join(',')].concat(its.map(i=>R.cols.map(c=>q(c[1](i))).join(',')));
   download((trip().name||'trip').replace(/[^\w\-]+/g,'-')+'-'+repTab+'-report.csv','﻿'+rows.join('\r\n'),'text/csv');
 }
+/* ============ GENERAL NOTES ============ */
+let noteQ='';
+const readAny=()=>{if(!ed)return;if(ed.kind==='note')readNote();else readForm();};
+function noteSnippet(b){return String(b||'').trim();}
+function renderNotes(){
+  const q=noteQ.trim().toLowerCase();
+  const all=(data.notes||[]).slice().sort((a,b)=>(a.title||'').localeCompare(b.title||'',undefined,{sensitivity:'base'}));
+  const list=q?all.filter(n=>((n.title||'')+' '+(n.body||'')).toLowerCase().includes(q)):all;
+  const cards=list.map(n=>{
+    const files=(n.atts||[]);
+    const imgs=files.filter(a=>/^image\//.test(a.type)),other=files.filter(a=>!/^image\//.test(a.type));
+    return '<article class="note" data-id="'+esc(n.id)+'"><div class="nh"><h3>'+esc(n.title||'Untitled')+'</h3><span class="hint">'+(n.updated?esc(new Date(n.updated).toLocaleDateString(undefined,{day:'numeric',month:'short',year:'numeric'})):'')+'</span><button class="btn" data-act="noteedit" data-id="'+esc(n.id)+'">Edit</button></div>'+
+      (noteSnippet(n.body)?'<div class="nb">'+esc(n.body)+'</div>':'')+
+      (imgs.length?'<div class="atts">'+imgs.map(a=>'<div class="att" data-id="'+esc(a.id)+'"><img alt="'+esc(a.name)+'" hidden data-act="openatt" data-id="'+esc(a.id)+'"></div>').join('')+'</div>':'')+
+      (other.length?'<div class="atts">'+other.map(a=>'<div class="att"><div class="fn" data-act="openatt" data-id="'+esc(a.id)+'">'+ico('clip')+' '+esc(a.name)+'<small>'+fmtSize(a.size||0)+'</small></div></div>').join('')+'</div>':'')+'</article>';
+  }).join('');
+  $('#main').innerHTML='<div class="notes-h"><input id="note_q" type="search" placeholder="Search notes…" value="'+esc(noteQ)+'" aria-label="Search notes"><span class="sp"></span><span class="hint">'+list.length+(q?' of '+all.length:'')+' note'+(all.length===1?'':'s')+'</span><button class="btn primary" data-act="notenew">+ New note</button></div>'+
+    (cards||'<div class="empty"><p>'+(all.length?'No notes match that search.':'No notes yet. Use <b>+ New note</b> for things like “how to load an IC card on an iPhone”. You can paste screenshots into a note.')+'</p></div>')+'<div class="notes-list" hidden></div>';
+  list.forEach(n=>(n.atts||[]).filter(a=>/^image\//.test(a.type)).forEach(a=>{
+    attBlob(a).then(b=>{const im=$('.note[data-id="'+n.id+'"] .att[data-id="'+a.id+'"] img');if(!im)return;if(b){im.src=URL.createObjectURL(b);im.hidden=false;}else im.closest('.att').innerHTML='<div class="fn">'+esc(a.name)+'<small>not on this device'+(msalAccount?'':' — sign in to fetch from OneDrive')+'</small></div>';});
+  }));
+}
+function openNote(id){
+  const orig=id?(data.notes||[]).find(n=>n.id===id):null;
+  const draft=orig?JSON.parse(JSON.stringify(orig)):{id:uid(),title:'',body:'',atts:[],created:Date.now(),updated:Date.now()};
+  ed={kind:'note',orig,draft,isNew:!orig,newAtts:new Set(),removed:[],saved:false};
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('note')+'<span>'+(ed.isNew?'New note':'Edit note')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    fld('Title',inp('n_title',draft.title,'text','e.g. Loading an IC card onto an iPhone'))+
+    fld('Content','<textarea id="n_body" style="min-height:240px" placeholder="Write the steps, details or reminders here">'+esc(draft.body)+'</textarea>')+
+    '<div class="blk" data-zone="file"><h4>'+ico('clip')+'Screenshots &amp; files</h4><div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop images or files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
+    '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="notedel">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="notesave">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
+  dlg.onclose=cleanupEd;dlg.showModal();renderAtts();
+  setTimeout(()=>{const t=$('#n_title');if(t&&ed&&ed.isNew)t.focus();},50);
+}
+function readNote(){
+  if(!ed||ed.kind!=='note')return;const d=ed.draft;
+  const t=$('#n_title'),b=$('#n_body');if(t)d.title=t.value.trim();if(b)d.body=b.value;
+}
+function saveNote(){
+  readNote();const d=ed.draft;
+  if(!d.title){toast('Please give the note a title.');return;}
+  d.updated=Date.now();
+  if(!data.notes)data.notes=[];
+  if(ed.isNew)data.notes.push(d);else Object.assign(ed.orig,d);
+  ed.saved=true;const rm=ed.removed.slice();
+  $('#dlg').close();rm.forEach(removeAttFiles);
+  changed();renderAll();sweepUploads();
+}
+async function deleteNote(){
+  const c=await askChoice('Delete this note?','“'+ed.orig.title+'” and its screenshots and files will be removed.',['Delete','Keep it']);
+  if(c!==0)return;
+  const n=ed.orig;ed.saved=true;$('#dlg').close();
+  n.atts.forEach(removeAttFiles);data.notes=data.notes.filter(x=>x.id!==n.id);changed();renderAll();toast('Note deleted.');
+}
 
 /* ============ EVENTS ============ */
 function go(date){selDate=date;view='day';try{localStorage.setItem(LS_VIEW,view);}catch(e){}renderAll();window.scrollTo({top:0});}
@@ -1792,7 +1850,7 @@ function pickFiles(zone){
   fi.accept=zone==='map'?'image/*':'*/*';fi.onchange=()=>{addFiles(Array.from(fi.files),zone==='map');fi.value='';};fi.click();
 }
 async function openAtt(id){
-  const a=ed&&ed.draft.atts.find(x=>x.id===id)||data.items.flatMap(i=>i.atts).find(x=>x.id===id);if(!a)return;
+  const a=ed&&ed.draft.atts.find(x=>x.id===id)||data.items.flatMap(i=>i.atts).concat((data.notes||[]).flatMap(n=>n.atts)).find(x=>x.id===id);if(!a)return;
   const b=await attBlob(a);
   if(!b){toast(msalAccount?'This file is not available yet.':'This file is not on this device. Sign in to fetch it from OneDrive.');return;}
   const u=URL.createObjectURL(b);
@@ -1829,8 +1887,12 @@ function onAct(el,e){
     case 'repprint':window.print();break;
     case 'dclose':{const d=el.closest('dialog');if(d)d.close();break;}
     case 'pickfile':pickFiles(el.dataset.zone);break;
-    case 'rmatt':{const id=el.dataset.id,i=ed.draft.atts.findIndex(a=>a.id===id);if(i>=0){const a=ed.draft.atts.splice(i,1)[0];if(ed.newAtts.has(id)){ed.newAtts.delete(id);removeAttFiles(a);}else ed.removed.push(a);readForm();renderAtts();}break;}
+    case 'rmatt':{const id=el.dataset.id,i=ed.draft.atts.findIndex(a=>a.id===id);if(i>=0){const a=ed.draft.atts.splice(i,1)[0];if(ed.newAtts.has(id)){ed.newAtts.delete(id);removeAttFiles(a);}else ed.removed.push(a);readAny();renderAtts();}break;}
     case 'openatt':openAtt(el.dataset.id);break;
+    case 'notenew':openNote();break;
+    case 'noteedit':openNote(el.dataset.id);break;
+    case 'notesave':saveNote();break;
+    case 'notedel':deleteNote();break;
     case 'findmap':findOnMap();break;
     case 'saveitem':saveItem();break;
     case 'delitem':deleteItem();break;
@@ -1901,7 +1963,7 @@ document.addEventListener('change',e=>{
     if(t.id==='dayTitle')dd.title=t.value.trim();else dd.notes=t.value;changed();renderRail();
   }
 });
-document.addEventListener('input',e=>{if(ed&&e.target.closest('#dlg'))updateGm();});
+document.addEventListener('input',e=>{if(e.target.id==='note_q'){noteQ=e.target.value;const pos=e.target.selectionStart;renderNotes();const q=$('#note_q');if(q){q.focus();q.setSelectionRange(pos,pos);}return;}if(ed&&ed.kind!=='note'&&e.target.closest('#dlg'))updateGm();});
 /* paste & drop of screenshots/files into the item dialog */
 function zoneOf(t){const z=t&&t.closest&&t.closest('[data-zone]');return z?z.dataset.zone:'file';}
 document.addEventListener('paste',e=>{
@@ -1923,12 +1985,12 @@ document.addEventListener('drop',e=>{
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&msalAccount&&!ed)syncFromOneDrive();});
 
 /* ============ START ============ */
-window.__travel={srcById,attBlob,trip,geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
+window.__travel={openNote,renderNotes,srcById,attBlob,trip,geocode,pdfItemsToMarkdown,pdfFileToText,parseAny,parseItinerary,planImport,applyImport,getData:()=>data,setData:d=>{data=normalise(d);},openItem,toISO};   // exposed for automated tests
 (async function init(){
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
   try{selTrip=localStorage.getItem(LS_SEL);view=localStorage.getItem(LS_VIEW)||'day';}catch(e){}
-  if(!['day','cal','agenda','map','reports'].includes(view))view='day';
+  if(!['day','cal','agenda','map','reports','notes'].includes(view))view='day';
   renderAll();setStatus('local');
   if(msalConfigured()&&window.msal){
     try{
