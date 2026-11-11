@@ -1807,7 +1807,7 @@ function openData(){
   dlg.onclose=null;if(!dlg.open)dlg.showModal();
 }
 /* ============ REPORTS: accommodation, meals, transport (with bookings) ============ */
-let repTab='stay',repAll=false,repMeal='',repMode='';
+let repTab='stay',repAll=false,repMeal='',repModes=[];
 const BK_SHORT={confirmed:'Booked',tobook:'To book',optional:'Recommended',included:'Included',none:'No booking'};
 const bkTag=it=>(it.bk&&it.bk!=='none')?'<span class="bk bk-'+it.bk+'">'+BK_SHORT[it.bk]+'</span>':'';
 const isBookable=i=>['confirmed','tobook','optional','included'].includes(i.bk)||(i.type==='transport'&&i.mode==='flight');
@@ -1830,7 +1830,7 @@ function repItems(tab){
   let its=tripItems().filter(i=>i.type===tab);
   if(tab!=='stay'&&!repAll)its=its.filter(isBookable);
   if(tab==='food'&&repMeal)its=its.filter(i=>i.meal===repMeal);
-  if(tab==='transport'&&repMode)its=its.filter(i=>(i.mode||'other')===repMode);
+  if(tab==='transport'&&repModes.length)its=its.filter(i=>repModes.includes(i.mode||'other'));
   const om={};const ord=i=>{if(tab==='stay')return 0;const m=om[i.date]||(om[i.date]=dayOrder(i.date));return m.get(i.id)||0;};
   return its.sort((a,b)=>a.date.localeCompare(b.date)||ord(a)-ord(b)||(tab==='stay'?(a.time||'').localeCompare(b.time||''):0));
 }
@@ -1865,10 +1865,10 @@ function renderReports(){
   const pc=priceTotals(its.filter(i=>i.bk==='confirmed')),pa=priceTotals(its);
   let h='<div class="rep"><div class="rep-bar nop"><div class="seg" id="repSeg">'+tabs+'</div><span class="sp"></span>'+
     (repTab==='food'?'<label class="chk">Meal <select id="rep_meal">'+[['','All meals']].concat(MEALS.filter(m=>m[0])).map(m=>'<option value="'+m[0]+'"'+(m[0]===repMeal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>':'')+
-    (repTab==='transport'?'<label class="chk">Type <select id="rep_mode">'+[['','All types']].concat(MODES).map(m=>'<option value="'+m[0]+'"'+(m[0]===repMode?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>':'')+
+    (repTab==='transport'?'<div class="calfilt nop" style="margin:0"><span class="hint">Type:</span>'+MODES.map(m=>'<button class="fchip k-transport'+(repModes.includes(m[0])?' on':'')+'" data-act="repmode" data-mode="'+m[0]+'" aria-pressed="'+repModes.includes(m[0])+'">'+esc(m[1])+'</button>').join('')+'<button class="linkbtn" data-act="repmodeall">'+(repModes.length?'All types':'All types ✓')+'</button></div>':'')+
     (repTab!=='stay'?'<label class="chk"><input type="checkbox" id="rep_all" '+(repAll?'checked':'')+'> Show everything, not just bookings</label>':'')+
     '<button class="btn" data-act="repcsv">Download CSV</button><button class="btn" data-act="repprint">Print</button></div>'+
-    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+(repTab==='food'&&repMeal?' — '+esc(BK_MEAL(repMeal)):'')+(repTab==='transport'&&repMode?' — '+esc(modeLabel(repMode)):'')+'</h2><div class="rep-chips">'+chips+'</div>'+
+    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+(repTab==='food'&&repMeal?' — '+esc(BK_MEAL(repMeal)):'')+(repTab==='transport'&&repModes.length?' — '+esc(repModes.map(modeLabel).join(', ')):'')+'</h2><div class="rep-chips">'+chips+'</div>'+
     (pa?'<div class="hint">Listed prices (first figure on each line; “pp” means per person): '+(pc?'<b>booked '+esc(pc)+'</b> · ':'')+'all listed '+esc(pa)+'</div>':'')+
     (gaps.length?'<div class="hint" style="color:var(--warn)">⚠ No accommodation for the night of '+gaps.map(d=>esc(fmtShort(d))).join(', ')+'</div>':'')+'</div>';
   if(!its.length)h+='<div class="empty"><p>Nothing to show here yet.'+(repTab!=='stay'&&!repAll?' Tick “Show everything” or change the filter to list every '+(repTab==='food'?'meal':'journey')+', or open an item and set its booking status.':'')+'</p></div>';
@@ -1978,6 +1978,8 @@ function onAct(el,e){
     case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
     case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
     case 'locate':locateAll();break;
+    case 'repmode':{const m=el.dataset.mode,k=repModes.indexOf(m);if(k<0)repModes.push(m);else repModes.splice(k,1);renderAll();break;}
+    case 'repmodeall':repModes=[];renderAll();break;
     case 'maptype':mapTypes[el.dataset.type]=!mapTypes[el.dataset.type];try{localStorage.setItem('travel-mgr-maptypes-v1',JSON.stringify(mapTypes));}catch(x){}renderAll();break;
     case 'mapall':{const all=TYPES.every(ty=>mapTypes[ty.id]);TYPES.forEach(ty=>mapTypes[ty.id]=!all);try{localStorage.setItem('travel-mgr-maptypes-v1',JSON.stringify(mapTypes));}catch(x){}renderAll();break;}
     case 'caltype':calTypes[el.dataset.type]=!calTypes[el.dataset.type];try{localStorage.setItem('travel-mgr-caltypes-v1',JSON.stringify(calTypes));}catch(x){}renderAll();break;
@@ -2043,7 +2045,6 @@ document.addEventListener('change',e=>{
   if(t.id==='f_type'){changeType(t.value);return;}
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
-  if(t.id==='rep_mode'){repMode=t.value;renderAll();}
   if(t.id==='map_tags'){mapTags=t.checked;try{localStorage.setItem('travel-mgr-maptags-v1',mapTags?'1':'0');}catch(x){}drawBigMap();}
   if(t.id==='rep_all'){repAll=t.checked;renderAll();}
   if(t.id==='i_day'){imp.day=t.value;runImportPreview(true);return;}
