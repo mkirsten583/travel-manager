@@ -1307,17 +1307,42 @@ function arcPoints(a,b){
   for(let i=0;i<=40;i++){const t=i/40,u=1-t;pts.push([u*u*a.lat+2*u*t*c.lat+t*t*b.lat,u*u*a.lng+2*u*t*c.lng+t*t*b.lng]);}
   return pts;
 }
-async function drawRoute(map,a,b,mode,color,via){
+const routeCache=new Map();
+async function fetchJson(url,ms){
+  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms||12000);
+  try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)return null;return await r.json();}catch(e){return null;}finally{clearTimeout(tm);}
+}
+/* Real-path routing by mode. Returns {pts,note} or null (then a straight line is drawn). */
+async function fetchRoute(mode,all){
+  const key=mode+'|'+all.map(p=>(+p.lat).toFixed(5)+','+(+p.lng).toFixed(5)).join(';');
+  if(routeCache.has(key))return routeCache.get(key);
+  let res=null;
+  const lnglat=all.map(p=>p.lng+','+p.lat).join(';');
+  if(mode==='car'||mode==='bus'){
+    const j=await fetchJson('https://router.project-osrm.org/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
+    if(j&&j.routes&&j.routes[0])res={pts:j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]),note:'Driving route (approximate road line).'};
+  }else if(mode==='walk'){
+    const j=await fetchJson('https://routing.openstreetmap.de/routed-foot/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
+    if(j&&j.routes&&j.routes[0])res={pts:j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]),note:'Walking route along footpaths and streets.'};
+  }else if(mode==='train'||mode==='subway'){
+    /* OpenRailRouting follows the actual railway / subway tracks (OpenStreetMap data) */
+    const j=await fetchJson('https://routing.openrailrouting.org/route?'+all.map(p=>'point='+p.lat+','+p.lng).join('&')+'&profile=all_tracks&points_encoded=false&type=json',15000);
+    const p0=j&&j.paths&&j.paths[0];
+    if(p0&&p0.points&&p0.points.coordinates&&p0.points.coordinates.length>1)res={pts:p0.points.coordinates.map(c=>[c[1],c[0]]),note:'Route follows the rail line (OpenStreetMap track data).'};
+  }
+  if(res)routeCache.set(key,res);
+  return res;
+}
+async function drawRoute(map,a,b,mode,color,via,noFetch){
   const vs=(via||[]).filter(v=>v&&isFinite(v.lat)&&isFinite(v.lng));
   const all=[a,...vs,b];
   let note=vs.length?'Straight lines through your '+vs.length+' stop'+(vs.length>1?'s':'')+' — not the actual track or road.':'Straight line between the two places — not the actual track or road.';
   let pts=all.map(p=>[p.lat,p.lng]),dash='6 6';
   if(mode==='flight'){pts=[];for(let i=0;i<all.length-1;i++)pts=pts.concat(arcPoints(all[i],all[i+1]));note='Flight path shown as an arc'+(vs.length?' through your stops':'')+'.';}
-  else if(mode==='car'||mode==='bus'){
-    try{
-      const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+all.map(p=>p.lng+','+p.lat).join(';')+'?overview=full&geometries=geojson');
-      if(r.ok){const j=await r.json();if(j.routes&&j.routes[0]){pts=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);dash=null;note='Driving route'+(vs.length?' via your stops':'')+' (approximate road line).';}}
-    }catch(e){}
+  else{
+    const r=noFetch?null:await fetchRoute(mode,all);
+    if(r){pts=r.pts;dash=null;note=r.note+(vs.length?' (through your stops)':'');}
+    else if(['car','bus','walk','train','subway'].includes(mode))note='Could not get the real route (service unreachable or no track/road found), so a straight line is shown. '+(vs.length?'It passes through your stops.':'Add stops on the way to bend the line.');
   }
   const line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);
   return {line,note};
@@ -1445,7 +1470,7 @@ async function drawBigMap(){
   const el=$('#bigmap');if(!el)return;
   if(!hasL()){el.innerHTML='<div class="empty" style="margin:20px">The map library could not load (offline?). Maps need an internet connection.</div>';return;}
   if(bigMap){bigMap.remove();bigMap=null;}
-  const m=bigMap=newMap(el);const bounds=[];let n=0,missing=0;
+  const m=bigMap=newMap(el);const bounds=[];let n=0,missing=0,routed=0; /* real road/rail lines are fetched for up to 30 journeys (all walks only when one day is chosen); the rest are straight lines so the map stays quick */
   /* a stay is shown for the nights you sleep there; on its check-out day it only shows if no other stay covers that day */
   const stays=tripItems().filter(i=>i.type==='stay');
   const sleeps=(s,d)=>s.date<=d&&d<(s.endDate||addDays(s.date,1));
@@ -1455,7 +1480,7 @@ async function drawBigMap(){
     if(it.type==='transport'){
       if(it.fromCoord&&it.toCoord){
         const a=it.fromCoord,b=it.toCoord;
-        const vias=(it.via||[]).filter(Boolean);const {line}=await drawRoute(m,a,b,it.mode,TYPE_COLOR.transport,vias);vias.forEach((v,k)=>{L.marker([v.lat,v.lng],{icon:pinIcon('transport',String(k+1),'')}).addTo(m).bindPopup('Stop '+(k+1)+' — '+esc(it.title));bounds.push([v.lat,v.lng]);});line.bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(it.from)+' → '+esc(it.to));
+        const vias=(it.via||[]).filter(Boolean);const skip=!mapDayFilter&&(it.mode==='walk'||routed>=30);if(!skip)routed++;const {line}=await drawRoute(m,a,b,it.mode,TYPE_COLOR.transport,vias,skip);vias.forEach((v,k)=>{L.marker([v.lat,v.lng],{icon:pinIcon('transport',String(k+1),'')}).addTo(m).bindPopup('Stop '+(k+1)+' — '+esc(it.title));bounds.push([v.lat,v.lng]);});line.bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(it.from)+' → '+esc(it.to));
         [[a,pinTag(it.date,it.time)],[b,'']].forEach(([p,tg])=>{L.marker([p.lat,p.lng],{icon:pinIcon('transport','',tg)}).addTo(m);bounds.push([p.lat,p.lng]);});n++;
       }else if(it.from||it.to)missing++;
     }else if(it.coord){
