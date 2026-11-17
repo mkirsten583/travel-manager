@@ -1308,44 +1308,73 @@ function arcPoints(a,b){
   return pts;
 }
 const routeCache=new Map();
-async function fetchJson(url,ms){
-  const ac=new AbortController(),tm=setTimeout(()=>ac.abort(),ms||12000);
-  try{const r=await fetch(url,{signal:ac.signal});if(!r.ok)return null;return await r.json();}catch(e){return null;}finally{clearTimeout(tm);}
+const RAIL_URL_DEFAULT='https://routing.openrailrouting.org/route';
+const railUrl=()=>{try{return (localStorage.getItem('travel-mgr-railurl-v1')||'').trim()||RAIL_URL_DEFAULT;}catch(e){return RAIL_URL_DEFAULT;}};
+let lastRouteDiag=null;
+/* fetch JSON and say exactly what happened, so a failure can be explained */
+async function fetchDiag(url,ms){
+  const ac=new AbortController(),t0=Date.now(),tm=setTimeout(()=>ac.abort(),ms||12000);
+  const d={url,status:null,ms:0,error:'',body:'',json:null};
+  try{
+    const r=await fetch(url,{signal:ac.signal});d.status=r.status;
+    const txt=await r.text();d.body=txt.slice(0,400);
+    try{d.json=JSON.parse(txt);}catch(e){}
+  }catch(e){
+    d.error=e&&e.name==='AbortError'?'Timed out after '+Math.round((ms||12000)/1000)+' s — the server did not answer.':'The browser could not get an answer ('+(e&&e.message||e)+'). This usually means the server is down, blocks this site (CORS), or the connection is blocked.';
+  }finally{clearTimeout(tm);d.ms=Date.now()-t0;}
+  return d;
 }
-/* Real-path routing by mode. Returns {pts,note} or null (then a straight line is drawn). */
-async function fetchRoute(mode,all){
+/* Real-path routing by mode. Returns {pts,note,diag}; pts is null when it failed. */
+async function fetchRoute(mode,all,force){
   const key=mode+'|'+all.map(p=>(+p.lat).toFixed(5)+','+(+p.lng).toFixed(5)).join(';');
-  if(routeCache.has(key))return routeCache.get(key);
-  let res=null;
+  if(!force&&routeCache.has(key))return routeCache.get(key);
   const lnglat=all.map(p=>p.lng+','+p.lat).join(';');
+  let d=null,pts=null,note='';
   if(mode==='car'||mode==='bus'){
-    const j=await fetchJson('https://router.project-osrm.org/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
-    if(j&&j.routes&&j.routes[0])res={pts:j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]),note:'Driving route (approximate road line).'};
+    d=await fetchDiag('https://router.project-osrm.org/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
+    const r=d.json&&d.json.routes&&d.json.routes[0];if(r){pts=r.geometry.coordinates.map(c=>[c[1],c[0]]);note='Driving route (approximate road line).';}
   }else if(mode==='walk'){
-    const j=await fetchJson('https://routing.openstreetmap.de/routed-foot/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
-    if(j&&j.routes&&j.routes[0])res={pts:j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]),note:'Walking route along footpaths and streets.'};
+    d=await fetchDiag('https://routing.openstreetmap.de/routed-foot/route/v1/driving/'+lnglat+'?overview=full&geometries=geojson');
+    const r=d.json&&d.json.routes&&d.json.routes[0];if(r){pts=r.geometry.coordinates.map(c=>[c[1],c[0]]);note='Walking route along footpaths and streets.';}
   }else if(mode==='train'||mode==='subway'){
-    /* OpenRailRouting follows the actual railway / subway tracks (OpenStreetMap data) */
-    const j=await fetchJson('https://routing.openrailrouting.org/route?'+all.map(p=>'point='+p.lat+','+p.lng).join('&')+'&profile=all_tracks&points_encoded=false&type=json',15000);
-    const p0=j&&j.paths&&j.paths[0];
-    if(p0&&p0.points&&p0.points.coordinates&&p0.points.coordinates.length>1)res={pts:p0.points.coordinates.map(c=>[c[1],c[0]]),note:'Route follows the rail line (OpenStreetMap track data).'};
+    const base=railUrl();
+    d=await fetchDiag(base+(base.includes('?')?'&':'?')+all.map(p=>'point='+p.lat+','+p.lng).join('&')+'&profile=all_tracks&points_encoded=false&type=json',20000);
+    const p0=d.json&&d.json.paths&&d.json.paths[0];
+    if(p0&&p0.points&&p0.points.coordinates&&p0.points.coordinates.length>1){pts=p0.points.coordinates.map(c=>[c[1],c[0]]);note='Route follows the rail line (OpenStreetMap track data).';}
   }
-  if(res)routeCache.set(key,res);
+  const res={pts,note,diag:d};lastRouteDiag=d;
+  if(pts)routeCache.set(key,res);
   return res;
+}
+function explainDiag(mode,d){
+  if(!d)return 'No routing is done for this mode — the line is a straight line (flights are drawn as arcs).';
+  const lines=['Mode: '+mode,'Request: '+d.url,'Time taken: '+d.ms+' ms'];
+  if(d.error)lines.push('Result: FAILED — '+d.error);
+  else{
+    lines.push('HTTP status: '+d.status);
+    const msg=d.json&&(d.json.message||(d.json.hints&&d.json.hints[0]&&d.json.hints[0].message)||d.json.code);
+    if(msg)lines.push('Server message: '+msg);
+    else if(!d.json)lines.push('The server answered with something that is not a route: '+d.body.slice(0,200));
+    if(d.status===401||d.status===403)lines.push('Meaning: the server refused the request (needs a key or blocks this site).');
+    else if(d.status===429)lines.push('Meaning: too many requests — wait a minute and try again.');
+    else if(d.json&&/cannot find point|not found|connection between/i.test(String(msg||'')))lines.push('Meaning: no track was found near one of the points, or the two points are not connected by track. Check the From/To pin sits on or next to a station, or add a Stop on the way on the line.');
+  }
+  return lines.join('\n');
 }
 async function drawRoute(map,a,b,mode,color,via,noFetch){
   const vs=(via||[]).filter(v=>v&&isFinite(v.lat)&&isFinite(v.lng));
   const all=[a,...vs,b];
   let note=vs.length?'Straight lines through your '+vs.length+' stop'+(vs.length>1?'s':'')+' — not the actual track or road.':'Straight line between the two places — not the actual track or road.';
-  let pts=all.map(p=>[p.lat,p.lng]),dash='6 6';
+  let pts=all.map(p=>[p.lat,p.lng]),dash='6 6',diag=null;
   if(mode==='flight'){pts=[];for(let i=0;i<all.length-1;i++)pts=pts.concat(arcPoints(all[i],all[i+1]));note='Flight path shown as an arc'+(vs.length?' through your stops':'')+'.';}
   else{
-    const r=noFetch?null:await fetchRoute(mode,all);
-    if(r){pts=r.pts;dash=null;note=r.note+(vs.length?' (through your stops)':'');}
+    const r=noFetch?null:await fetchRoute(mode,all);diag=r&&r.diag;
+    if(r&&r.pts){pts=r.pts;dash=null;note=r.note+(vs.length?' (through your stops)':'');}
     else if(['car','bus','walk','train','subway'].includes(mode))note='Could not get the real route (service unreachable or no track/road found), so a straight line is shown. '+(vs.length?'It passes through your stops.':'Add stops on the way to bend the line.');
   }
-  const line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);
-  return {line,note};
+  let line;
+  try{line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);}catch(e){line={bindPopup(){return line;}};} /* the map was closed or redrawn while the route was loading */
+  return {line,note,diag,mode};
 }
 const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0',other:'#5b7083'};
 function pinIcon(type,label,tag){return L.divIcon({className:'',html:'<div class="pinw"><div class="pin k-'+type+'">'+esc(label||'')+'</div>'+(tag?'<span class="ptag k-'+type+'">'+esc(tag)+'</span>':'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
@@ -1554,8 +1583,8 @@ function renderItemDialog(first){
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files or PDFs, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose PDFs / files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><button type="button" class="btn" data-act="clearmap" title="Remove the map link and the pin for this item">Remove link &amp; pin</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
-    '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From coordinates (latitude, longitude)',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To coordinates (latitude, longitude)',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div>'+(tr?viaHtml(d):'')+'<div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
-    '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+
+    '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From — coordinates (latitude, longitude) or a place name',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To — coordinates (latitude, longitude) or a place name',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div>'+(tr?viaHtml(d):'')+'<div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
+    '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+(tr?'<div id="routeDiagBox" hidden style="margin:6px 0"><pre id="routeDiag" class="fmt" style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;margin:0 0 6px"></pre>'+((d.mode==='train'||d.mode==='subway')?fld('Rail routing server (advanced — leave blank for the default)',inp('f_railurl',(function(){try{return localStorage.getItem('travel-mgr-railurl-v1')||'';}catch(e){return '';}})(),'url',RAIL_URL_DEFAULT)):'')+'</div>':'')+
     '<div class="drop" tabindex="0" data-zone="map" id="dropMap">Paste or drop a map image here (e.g. a screenshot of Google Maps) or <button type="button" class="linkbtn" data-act="pickfile" data-zone="map">choose an image</button></div><div class="atts" id="attsMap"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="delitem">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="saveitem">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
   if(first){dlg.onclose=cleanupEd;dlg.showModal();}
@@ -1638,15 +1667,15 @@ async function mountEdMap(){
   if(d.type==='transport'){
     if(d.fromCoord)mk(d.fromCoord,'from','A');if(d.toCoord)mk(d.toCoord,'to','B');
     (d.via||[]).forEach((v,i)=>{if(v)mk(v,'via'+i,String(i+1));});
-    if(d.fromCoord&&d.toCoord){const r=await drawRoute(m,d.fromCoord,d.toCoord,d.mode,TYPE_COLOR.transport,d.via);if(!ed||edMap!==m)return;const n=$('#edMapNote');if(n)n.textContent=r.note;}
+    if(d.fromCoord&&d.toCoord){const r=await drawRoute(m,d.fromCoord,d.toCoord,d.mode,TYPE_COLOR.transport,d.via);if(!ed||edMap!==m)return;const n=$('#edMapNote');if(n){n.innerHTML=esc(r.note)+(['train','subway','car','bus','walk'].includes(d.mode)?' <button type="button" class="linkbtn" data-act="routediag">Why? / test route</button>':'');}ed.lastDiag=r.diag;}
   }else if(d.coord)mk(d.coord,'place','');
   if(pts.length)m.fitBounds(pts,{padding:[30,30],maxZoom:15});
   setTimeout(()=>{if(edMap===m)m.invalidateSize();},120);
 }
 function viaHtml(d){
   const v=d.via||[];
-  return '<div class="blk-via" style="margin:6px 0"><div class="hint" style="margin-bottom:4px"><b>Stops on the way</b> (optional, in travel order) — the route is drawn through them.</div>'+
-    v.map((p,i)=>'<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><span class="hint" style="width:56px">Stop '+(i+1)+'</span><input id="f_llvia_'+i+'" type="text" value="'+esc(fmtLL(p))+'" placeholder="e.g. 36.0652, 136.2216" style="flex:1"><button type="button" class="btn" data-act="rmvia" data-i="'+i+'" aria-label="Remove stop '+(i+1)+'">&times;</button></div>').join('')+
+  return '<div class="blk-via" style="margin:6px 0"><div class="hint" style="margin-bottom:4px"><b>Stops on the way</b> (optional, in travel order) — type coordinates or a place name (e.g. Fukui Station); the route is drawn through them.</div>'+
+    v.map((p,i)=>'<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><span class="hint" style="width:56px">Stop '+(i+1)+'</span><input id="f_llvia_'+i+'" type="text" value="'+esc(fmtLL(p))+'" placeholder="coordinates or a place name, e.g. Fukui Station" style="flex:1"><button type="button" class="btn" data-act="rmvia" data-i="'+i+'" aria-label="Remove stop '+(i+1)+'">&times;</button></div>').join('')+
     '<button type="button" class="btn" data-act="addvia">+ Add stop</button></div>';
 }
 const fmtLL=c=>c&&isFinite(c.lat)&&isFinite(c.lng)?(+c.lat).toFixed(6)+', '+(+c.lng).toFixed(6):'';
@@ -1662,15 +1691,46 @@ function syncLL(){
   if(!ed||ed.kind==='note')return;const d=ed.draft,set=(id,c)=>{const e=$('#'+id);if(e&&document.activeElement!==e)e.value=fmtLL(c);};
   set('f_ll',d.coord);set('f_llfrom',d.fromCoord);set('f_llto',d.toCoord);(d.via||[]).forEach((p,i)=>set('f_llvia_'+i,p));
 }
-function applyLL(id){
-  const e=$('#'+id);if(!e||!ed)return;const d=ed.draft,v=parseLL(e.value);
+async function nameToCoord(txt){
+  const reg=(trip()&&trip().region)||'';
+  const fake={type:'activity',title:txt,place:'',address:'',date:(ed&&ed.draft.date)||selDate,id:'_'};
+  let v=await geoFind(fake,'place');
+  if(!v)v=await geocode(txt+(reg?', '+reg:''));
+  return v||null;
+}
+async function applyLL(id){
+  const e=$('#'+id);if(!e||!ed)return;const d=ed.draft;
   const vm=id.match(/^f_llvia_(\d+)$/);
-  if(vm){const i=+vm[1],v=parseLL(e.value);if(v===undefined){toast('Could not read those coordinates. Use latitude, longitude — for example 36.0652, 136.2216.');return;}if(!d.via)d.via=[];d.via[i]=v;d.coordManual=true;if(!v){d.via.splice(i,1);readForm();renderItemDialog(false);}else e.value=fmtLL(v);mountEdMap();return;}
-  const key=id==='f_llfrom'?'fromCoord':id==='f_llto'?'toCoord':'coord';
+  const key=vm?'via':id==='f_llfrom'?'fromCoord':id==='f_llto'?'toCoord':'coord';
+  let v=parseLL(e.value),label='';
+  if(v===undefined&&e.value.trim()){
+    const q=e.value.trim();toast('Searching for “'+q+'”…');
+    const f=await nameToCoord(q);
+    if(!ed)return;
+    if(!f){toast(geoNetErr?'The place search could not be reached. Type coordinates instead.':'Could not find “'+q+'”. Try a more specific name or type coordinates, e.g. 36.2381, 137.9720.');return;}
+    v=f;label=q;
+  }
   if(v===undefined){toast('Could not read those coordinates. Use latitude, longitude — for example 36.2381, 137.9720.');return;}
-  d[key]=v;if(v)d.coordManual=true;
+  if(vm){
+    const i=+vm[1];if(!d.via)d.via=[];
+    if(!v){d.via.splice(i,1);readForm();renderItemDialog(false);mountEdMap();return;}
+    d.via[i]=v;
+  }else d[key]=v;
+  if(v)d.coordManual=true;
   e.value=fmtLL(v);mountEdMap();
-  toast(v?'Pin set from coordinates — press Save to keep it.':'Pin removed — press Save to keep that.');
+  toast(label?'Found “'+label+'” at '+fmtLL(v)+' — press Save to keep it.':(v?'Pin set from coordinates — press Save to keep it.':'Pin removed — press Save to keep that.'));
+}
+async function routeDiag(){
+  if(!ed||ed.draft.type!=='transport')return;const d=ed.draft,box=$('#routeDiagBox'),pre=$('#routeDiag');if(!box||!pre)return;
+  box.hidden=false;
+  if(!d.fromCoord||!d.toCoord){pre.textContent='Set both the From and To points first (type a place name or coordinates, or use Find both ends).';return;}
+  if(d.mode==='flight'){pre.textContent='Flights are drawn as an arc, not along a track.';return;}
+  if(!['train','subway','car','bus','walk'].includes(d.mode)){pre.textContent='Routing is only available for train, subway, bus, car and walk. This mode is drawn as a straight line.';return;}
+  pre.textContent='Testing the route service…';
+  const all=[d.fromCoord,...(d.via||[]).filter(Boolean),d.toCoord];
+  const r=await fetchRoute(d.mode,all,true);
+  pre.textContent=explainDiag(d.mode,r.diag)+(r.pts?'\nSUCCESS: found a route with '+r.pts.length+' points.':'\nNo route line was drawn — a dashed straight line is shown instead.');
+  if(r.pts)mountEdMap();
 }
 function addVia(){readForm();const d=ed.draft;if(!d.via)d.via=[];d.via.push(null);renderItemDialog(false);const e=$('#f_llvia_'+(d.via.length-1));if(e)e.focus();}
 function rmVia(i){readForm();const d=ed.draft;(d.via||[]).splice(i,1);renderItemDialog(false);mountEdMap();}
@@ -2064,6 +2124,7 @@ function onAct(el,e){
     case 'notedel':deleteNote();break;
     case 'findmap':findOnMap();break;
     case 'clearmap':clearMapLoc();break;
+    case 'routediag':routeDiag();break;
     case 'addvia':addVia();break;
     case 'rmvia':rmVia(+el.dataset.i);break;
     case 'saveitem':saveItem();break;
@@ -2105,6 +2166,7 @@ $('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
+  if(t.id==='f_railurl'){try{const v=t.value.trim();if(v)localStorage.setItem('travel-mgr-railurl-v1',v);else localStorage.removeItem('travel-mgr-railurl-v1');}catch(x){}toast(t.value.trim()?'Rail routing server saved.':'Using the default rail routing server.');return;}
   if(/^f_ll(from|to|via_\d+)?$/.test(t.id)){applyLL(t.id);return;}
   if(t.id==='f_type'){changeType(t.value);return;}
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
