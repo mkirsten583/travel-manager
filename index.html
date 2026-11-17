@@ -308,6 +308,7 @@ function normalise(o){
   for(const k of Object.keys(d.geo))if(!d.geo[k])delete d.geo[k];
   for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];}
   for(const n of d.notes){n.id=n.id||uid();n.title=n.title||'';n.body=n.body||'';n.atts=Array.isArray(n.atts)?n.atts:[];}
+  for(const it of d.items){if(it.via!=null)it.via=(Array.isArray(it.via)?it.via:[]).filter(v=>!v||(isFinite(v.lat)&&isFinite(v.lng)));}
   for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
   return d;
 }
@@ -1306,14 +1307,16 @@ function arcPoints(a,b){
   for(let i=0;i<=40;i++){const t=i/40,u=1-t;pts.push([u*u*a.lat+2*u*t*c.lat+t*t*b.lat,u*u*a.lng+2*u*t*c.lng+t*t*b.lng]);}
   return pts;
 }
-async function drawRoute(map,a,b,mode,color){
-  let note='Straight line between the two places — not the actual track or road.';
-  let pts=[[a.lat,a.lng],[b.lat,b.lng]],dash='6 6';
-  if(mode==='flight'){pts=arcPoints(a,b);note='Flight path shown as an arc.';}
+async function drawRoute(map,a,b,mode,color,via){
+  const vs=(via||[]).filter(v=>v&&isFinite(v.lat)&&isFinite(v.lng));
+  const all=[a,...vs,b];
+  let note=vs.length?'Straight lines through your '+vs.length+' stop'+(vs.length>1?'s':'')+' — not the actual track or road.':'Straight line between the two places — not the actual track or road.';
+  let pts=all.map(p=>[p.lat,p.lng]),dash='6 6';
+  if(mode==='flight'){pts=[];for(let i=0;i<all.length-1;i++)pts=pts.concat(arcPoints(all[i],all[i+1]));note='Flight path shown as an arc'+(vs.length?' through your stops':'')+'.';}
   else if(mode==='car'||mode==='bus'){
     try{
-      const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+a.lng+','+a.lat+';'+b.lng+','+b.lat+'?overview=full&geometries=geojson');
-      if(r.ok){const j=await r.json();if(j.routes&&j.routes[0]){pts=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);dash=null;note='Driving route (approximate road line).';}}
+      const r=await fetch('https://router.project-osrm.org/route/v1/driving/'+all.map(p=>p.lng+','+p.lat).join(';')+'?overview=full&geometries=geojson');
+      if(r.ok){const j=await r.json();if(j.routes&&j.routes[0]){pts=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);dash=null;note='Driving route'+(vs.length?' via your stops':'')+' (approximate road line).';}}
     }catch(e){}
   }
   const line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);
@@ -1452,7 +1455,7 @@ async function drawBigMap(){
     if(it.type==='transport'){
       if(it.fromCoord&&it.toCoord){
         const a=it.fromCoord,b=it.toCoord;
-        const {line}=await drawRoute(m,a,b,it.mode,TYPE_COLOR.transport);line.bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(it.from)+' → '+esc(it.to));
+        const vias=(it.via||[]).filter(Boolean);const {line}=await drawRoute(m,a,b,it.mode,TYPE_COLOR.transport,vias);vias.forEach((v,k)=>{L.marker([v.lat,v.lng],{icon:pinIcon('transport',String(k+1),'')}).addTo(m).bindPopup('Stop '+(k+1)+' — '+esc(it.title));bounds.push([v.lat,v.lng]);});line.bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(it.from)+' → '+esc(it.to));
         [[a,pinTag(it.date,it.time)],[b,'']].forEach(([p,tg])=>{L.marker([p.lat,p.lng],{icon:pinIcon('transport','',tg)}).addTo(m);bounds.push([p.lat,p.lng]);});n++;
       }else if(it.from||it.to)missing++;
     }else if(it.coord){
@@ -1526,7 +1529,7 @@ function renderItemDialog(first){
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files or PDFs, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose PDFs / files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><button type="button" class="btn" data-act="clearmap" title="Remove the map link and the pin for this item">Remove link &amp; pin</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
-    '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From coordinates (latitude, longitude)',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To coordinates (latitude, longitude)',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div><div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
+    '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From coordinates (latitude, longitude)',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To coordinates (latitude, longitude)',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div>'+(tr?viaHtml(d):'')+'<div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
     '<div class="mapbox sm" id="edMap"></div><div class="mapnote" id="edMapNote">'+(tr?'Enter From and To, then Find both ends. Drag a pin to correct it.':'Fill in the place or address, then Find on map. Drag the pin to correct it.')+'</div>'+
     '<div class="drop" tabindex="0" data-zone="map" id="dropMap">Paste or drop a map image here (e.g. a screenshot of Google Maps) or <button type="button" class="linkbtn" data-act="pickfile" data-zone="map">choose an image</button></div><div class="atts" id="attsMap"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="delitem">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="saveitem">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
@@ -1604,15 +1607,22 @@ async function mountEdMap(){
   const pts=[];
   const mk=(c,which,label)=>{
     const mm=L.marker([c.lat,c.lng],{draggable:true,icon:pinIcon(d.type,label)}).addTo(m);
-    mm.on('dragend',()=>{const p=mm.getLatLng();const v={lat:p.lat,lng:p.lng};if(which==='from')d.fromCoord=v;else if(which==='to')d.toCoord=v;else d.coord=v;d.coordManual=true;syncLL();if(d.type==='transport')mountEdMap();});
+    mm.on('dragend',()=>{const p=mm.getLatLng();const v={lat:p.lat,lng:p.lng};if(which==='from')d.fromCoord=v;else if(which==='to')d.toCoord=v;else if(/^via\d+$/.test(which))d.via[+which.slice(3)]=v;else d.coord=v;d.coordManual=true;syncLL();if(d.type==='transport')mountEdMap();});
     pts.push([c.lat,c.lng]);
   };
   if(d.type==='transport'){
     if(d.fromCoord)mk(d.fromCoord,'from','A');if(d.toCoord)mk(d.toCoord,'to','B');
-    if(d.fromCoord&&d.toCoord){const r=await drawRoute(m,d.fromCoord,d.toCoord,d.mode,TYPE_COLOR.transport);if(!ed||edMap!==m)return;const n=$('#edMapNote');if(n)n.textContent=r.note;}
+    (d.via||[]).forEach((v,i)=>{if(v)mk(v,'via'+i,String(i+1));});
+    if(d.fromCoord&&d.toCoord){const r=await drawRoute(m,d.fromCoord,d.toCoord,d.mode,TYPE_COLOR.transport,d.via);if(!ed||edMap!==m)return;const n=$('#edMapNote');if(n)n.textContent=r.note;}
   }else if(d.coord)mk(d.coord,'place','');
   if(pts.length)m.fitBounds(pts,{padding:[30,30],maxZoom:15});
   setTimeout(()=>{if(edMap===m)m.invalidateSize();},120);
+}
+function viaHtml(d){
+  const v=d.via||[];
+  return '<div class="blk-via" style="margin:6px 0"><div class="hint" style="margin-bottom:4px"><b>Stops on the way</b> (optional, in travel order) — the route is drawn through them.</div>'+
+    v.map((p,i)=>'<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><span class="hint" style="width:56px">Stop '+(i+1)+'</span><input id="f_llvia_'+i+'" type="text" value="'+esc(fmtLL(p))+'" placeholder="e.g. 36.0652, 136.2216" style="flex:1"><button type="button" class="btn" data-act="rmvia" data-i="'+i+'" aria-label="Remove stop '+(i+1)+'">&times;</button></div>').join('')+
+    '<button type="button" class="btn" data-act="addvia">+ Add stop</button></div>';
 }
 const fmtLL=c=>c&&isFinite(c.lat)&&isFinite(c.lng)?(+c.lat).toFixed(6)+', '+(+c.lng).toFixed(6):'';
 function parseLL(s){
@@ -1625,19 +1635,23 @@ function parseLL(s){
 }
 function syncLL(){
   if(!ed||ed.kind==='note')return;const d=ed.draft,set=(id,c)=>{const e=$('#'+id);if(e&&document.activeElement!==e)e.value=fmtLL(c);};
-  set('f_ll',d.coord);set('f_llfrom',d.fromCoord);set('f_llto',d.toCoord);
+  set('f_ll',d.coord);set('f_llfrom',d.fromCoord);set('f_llto',d.toCoord);(d.via||[]).forEach((p,i)=>set('f_llvia_'+i,p));
 }
 function applyLL(id){
   const e=$('#'+id);if(!e||!ed)return;const d=ed.draft,v=parseLL(e.value);
+  const vm=id.match(/^f_llvia_(\d+)$/);
+  if(vm){const i=+vm[1],v=parseLL(e.value);if(v===undefined){toast('Could not read those coordinates. Use latitude, longitude — for example 36.0652, 136.2216.');return;}if(!d.via)d.via=[];d.via[i]=v;d.coordManual=true;if(!v){d.via.splice(i,1);readForm();renderItemDialog(false);}else e.value=fmtLL(v);mountEdMap();return;}
   const key=id==='f_llfrom'?'fromCoord':id==='f_llto'?'toCoord':'coord';
   if(v===undefined){toast('Could not read those coordinates. Use latitude, longitude — for example 36.2381, 137.9720.');return;}
   d[key]=v;if(v)d.coordManual=true;
   e.value=fmtLL(v);mountEdMap();
   toast(v?'Pin set from coordinates — press Save to keep it.':'Pin removed — press Save to keep that.');
 }
+function addVia(){readForm();const d=ed.draft;if(!d.via)d.via=[];d.via.push(null);renderItemDialog(false);const e=$('#f_llvia_'+(d.via.length-1));if(e)e.focus();}
+function rmVia(i){readForm();const d=ed.draft;(d.via||[]).splice(i,1);renderItemDialog(false);mountEdMap();}
 function clearMapLoc(){
   readForm();const d=ed.draft;
-  d.mapLink='';d.coord=null;d.fromCoord=null;d.toCoord=null;d.coordManual=false;
+  d.mapLink='';d.coord=null;d.fromCoord=null;d.toCoord=null;d.via=[];d.coordManual=false;
   ed.q0={place:geoQ(d,'place'),from:geoQ(d,'from'),to:geoQ(d,'to')};
   const f=$('#f_maplink');if(f)f.value='';
   updateGm();syncLL();mountEdMap();toast('Map link and pin removed — press Save to keep that.');
@@ -1655,6 +1669,7 @@ async function findOnMap(){
 }
 function saveItem(){
   readForm();const d=ed.draft;
+  if(d.via)d.via=d.via.filter(Boolean);
   if(!d.title){toast('Please give this item a name.');return;}
   if(!parseISO(d.date)){toast('Please choose a date.');return;}
   if(d.type==='stay'){if(!d.endDate||d.endDate<d.date)d.endDate=addDays(d.date,1);}else d.endDate='';
@@ -2020,6 +2035,8 @@ function onAct(el,e){
     case 'notedel':deleteNote();break;
     case 'findmap':findOnMap();break;
     case 'clearmap':clearMapLoc();break;
+    case 'addvia':addVia();break;
+    case 'rmvia':rmVia(+el.dataset.i);break;
     case 'saveitem':saveItem();break;
     case 'delitem':deleteItem();break;
     case 'impPreview':runImportPreview();break;
@@ -2059,7 +2076,7 @@ $('#viewSeg').addEventListener('click',e=>{const b=e.target.closest('button[data
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.id==='i_mode')syncImpMode();
-  if(/^f_ll(from|to)?$/.test(t.id)){applyLL(t.id);return;}
+  if(/^f_ll(from|to|via_\d+)?$/.test(t.id)){applyLL(t.id);return;}
   if(t.id==='f_type'){changeType(t.value);return;}
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
