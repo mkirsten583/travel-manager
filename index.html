@@ -175,7 +175,7 @@ dialog .toast{top:14px;bottom:auto}
 
 .bk{display:inline-block;font-size:11px;font-weight:650;padding:0 8px;border-radius:999px;border:1px solid var(--line);margin-left:6px;color:var(--ink);white-space:nowrap}
 .rep-head .bk,.rep-bar .bk{margin-left:0;margin-right:6px}
-.bk-confirmed{background:#2e7d4f33;border-color:#2e7d4f88}.bk-tobook{background:#b3261e2e;border-color:#b3261e88}.bk-optional{background:#b26a0030;border-color:#b26a0088}.bk-included{background:#2b6cb030;border-color:#2b6cb088}
+.bk-valid{background:#1e8449;color:#fff}.bk-confirmed{background:#2e7d4f33;border-color:#2e7d4f88}.bk-tobook{background:#b3261e2e;border-color:#b3261e88}.bk-optional{background:#b26a0030;border-color:#b26a0088}.bk-included{background:#2b6cb030;border-color:#2b6cb088}
 .notes-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.notes-h input{flex:1;min-width:160px;max-width:340px}.nlist{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}.nrow{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink);font:inherit;padding:11px 14px;cursor:pointer}.nrow:last-child{border-bottom:0}.nrow:hover{background:var(--wk)}.nrow .nt{flex:1;font-weight:600;min-width:0;overflow-wrap:anywhere}.nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:0 0 10px}.note{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}.note .nh{display:flex;gap:10px;align-items:center}.note .nh h3{margin:0;font-size:16px;flex:1}.note .nb{white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;margin:8px 0}.note .atts{margin-top:8px}#n_body{width:100%;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px}.layout.rep{grid-template-columns:1fr}.layout.rep .rail{display:none}
 .rep-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
 .rep-bar .sp{flex:1}.chk{font-size:13px;display:flex;gap:5px;align-items:center}
@@ -1370,7 +1370,7 @@ function cardHtml(it,date){
   else if(it.type==='food'){const ml=(MEALS.find(m=>m[0]===it.meal)||[])[1];if(ml&&it.meal)sub.push(esc(ml));if(it.place)sub.push(esc(it.place));}
   else if(it.type==='stay'){if(it.address||it.place)sub.push(esc(it.address||it.place));if(date===it.date&&it.endDate)sub.push('until '+esc(fmtShort(it.endDate)));}
   else if(it.place)sub.push(esc(it.place));
-  return '<div class="card k-'+it.type+'" data-act="open" data-id="'+esc(it.id)+'" tabindex="0"><div class="ico">'+ico(iconFor(it))+'</div><div class="cb"><div class="t1">'+(tm?'<span class="tm">'+esc(tm)+'</span>':'')+esc(it.title)+tag+bkTag(it)+(it.gone?'<span class="mini" title="This item was not in the latest imported itinerary">not in latest import</span>':'')+'</div>'+
+  return '<div class="card k-'+it.type+'" data-act="open" data-id="'+esc(it.id)+'" tabindex="0"><div class="ico">'+ico(iconFor(it))+'</div><div class="cb"><div class="t1">'+(tm?'<span class="tm">'+esc(tm)+'</span>':'')+esc(it.title)+tag+bkTag(it)+validTag(it)+(it.gone?'<span class="mini" title="This item was not in the latest imported itinerary">not in latest import</span>':'')+'</div>'+
     (sub.length?'<div class="t2">'+sub.join(' · ')+'</div>':'')+(it.notes&&it.notes.trim()?'<div class="nt">'+esc(it.notes)+'</div>':'')+'</div>'+badgesHtml(it)+'</div>';
 }
 function renderEmpty(){
@@ -1523,7 +1523,7 @@ function renderItemDialog(first){
   else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='activity'||d.type==='other')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld(d.type==='other'?'Reference':'Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld(rail?'Service':'Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
-  const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+'</div>';
+  const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+(tr?'<label class="chk" style="margin-top:6px"><input type="checkbox" id="f_valid"'+(d.valid?' checked':'')+'> <b>✓ Validated</b> — route, times and booking checked</label>':'')+'</div>';
   const dlg=$('#dlg');
   dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+bkBlk+
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
@@ -1563,7 +1563,7 @@ function gmUrl(d){
 function readForm(){
   const d=ed.draft,g=id=>{const e=$('#'+id);return e?e.value.trim():null;};
   const set=(f,id)=>{const v=g(id);if(v!==null)d[f]=v;};
-  set('title','f_title');set('date','f_date');set('endDate','f_end');set('time','f_time');set('endTime','f_etime');set('address','f_addr');set('place','f_place');set('meal','f_meal');set('mode','f_mode');set('from','f_from');set('to','f_to');set('ref','f_ref');set('link','f_link');set('mapLink','f_maplink');set('bk','f_bk');set('price','f_price');set('svc','f_svc');set('how','f_how');set('bkNote','f_bknote');
+  set('title','f_title');set('date','f_date');set('endDate','f_end');set('time','f_time');set('endTime','f_etime');set('address','f_addr');set('place','f_place');set('meal','f_meal');set('mode','f_mode');set('from','f_from');set('to','f_to');set('ref','f_ref');set('link','f_link');set('mapLink','f_maplink');set('bk','f_bk');set('price','f_price');set('svc','f_svc');set('how','f_how');set('bkNote','f_bknote');{const vc=$('#f_valid');if(vc)d.valid=vc.checked;}
   const n=$('#f_notes');if(n)d.notes=n.value;
   if(d.time)d.slot='';
 }
@@ -1828,9 +1828,10 @@ function openData(){
   dlg.onclose=null;if(!dlg.open)dlg.showModal();
 }
 /* ============ REPORTS: accommodation, meals, transport (with bookings) ============ */
-let repTab='stay',repAll=false,repMeal='',repModes=[];
+let repTab='stay',repAll=false,repMeal='',repModes=[],repVal='';
 const BK_SHORT={confirmed:'Booked',tobook:'To book',optional:'Recommended',included:'Included',none:'No booking'};
 const bkTag=it=>(it.bk&&it.bk!=='none')?'<span class="bk bk-'+it.bk+'">'+BK_SHORT[it.bk]+'</span>':'';
+const validTag=it=>(it.type==='transport'&&it.valid)?'<span class="bk bk-valid" title="Validated">✓ Validated</span>':'';
 const isBookable=i=>['confirmed','tobook','optional','included'].includes(i.bk)||(i.type==='transport'&&i.mode==='flight');
 const BK_MEAL=k=>(MEALS.find(m=>m[0]===k)||[])[1]||k;
 const modeLabel=m=>(MODES.find(x=>x[0]===m)||[])[1]||'';
@@ -1845,12 +1846,13 @@ const REP={
     ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote],['Notes',i=>trunc(i.notes,160)]]},
   transport:{label:'Transport',cols:[
     ['Date',i=>fmtShort(i.date)],['Depart',i=>i.time],['Arrive',i=>i.endTime],['Journey',i=>(i.from||i.to)?i.from+' → '+i.to:i.title],['Mode',i=>modeLabel(i.mode)],['Service',i=>i.svc],
-    ['Status',i=>BK_LABEL[i.bk]||''],['Reference',i=>i.ref],['Price / booking no.',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote]]}
+    ['Status',i=>BK_LABEL[i.bk]||''],['Validated',i=>i.valid?'Yes':''],['Reference',i=>i.ref],['Price / booking no.',i=>i.price],['How to book / contact',i=>i.how],['Booking note',i=>i.bkNote]]}
 };
 function repItems(tab){
   let its=tripItems().filter(i=>i.type===tab);
   if(tab!=='stay'&&!repAll)its=its.filter(isBookable);
   if(tab==='food'&&repMeal)its=its.filter(i=>i.meal===repMeal);
+  if(tab==='transport'&&repVal)its=its.filter(i=>repVal==='yes'?!!i.valid:!i.valid);
   if(tab==='transport'&&repModes.length)its=its.filter(i=>repModes.includes(i.mode||'other'));
   const om={};const ord=i=>{if(tab==='stay')return 0;const m=om[i.date]||(om[i.date]=dayOrder(i.date));return m.get(i.id)||0;};
   return its.sort((a,b)=>a.date.localeCompare(b.date)||ord(a)-ord(b)||(tab==='stay'?(a.time||'').localeCompare(b.time||''):0));
@@ -1882,20 +1884,22 @@ function renderReports(){
   const tabs=Object.keys(REP).map(k=>'<button data-act="reptab" data-tab="'+k+'" class="'+(k===repTab?'on':'')+'">'+REP[k].label+' <span class="n">'+tripItems().filter(i=>i.type===k&&(k==='stay'||isBookable(i))).length+'</span></button>').join('');
   const gaps=repTab==='stay'?nightsGap():[];
   const nights=repTab==='stay'?its.reduce((n,i)=>n+Math.max(1,diffDays(i.date,i.endDate||addDays(i.date,1))),0):0;
-  const chips='<span class="bk bk-confirmed">'+cnt('confirmed')+' booked</span><span class="bk bk-tobook">'+cnt('tobook')+' to book</span><span class="bk bk-optional">'+cnt('optional')+' recommended</span><span class="bk bk-included">'+cnt('included')+' included</span>'+(repTab==='stay'?'<span class="bk">'+nights+' nights</span>':'');
+  const chips='<span class="bk bk-confirmed">'+cnt('confirmed')+' booked</span><span class="bk bk-tobook">'+cnt('tobook')+' to book</span><span class="bk bk-optional">'+cnt('optional')+' recommended</span><span class="bk bk-included">'+cnt('included')+' included</span>'+(repTab==='stay'?'<span class="bk">'+nights+' nights</span>':'')+(repTab==='transport'?'<span class="bk bk-valid">✓ '+all.filter(i=>i.valid).length+' validated</span><span class="bk">'+all.filter(i=>!i.valid).length+' not yet validated</span>':'');
   const pc=priceTotals(its.filter(i=>i.bk==='confirmed')),pa=priceTotals(its);
   let h='<div class="rep"><div class="rep-bar nop"><div class="seg" id="repSeg">'+tabs+'</div><span class="sp"></span>'+
     (repTab==='food'?'<label class="chk">Meal <select id="rep_meal">'+[['','All meals']].concat(MEALS.filter(m=>m[0])).map(m=>'<option value="'+m[0]+'"'+(m[0]===repMeal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></label>':'')+
     (repTab==='transport'?'<div class="calfilt nop" style="margin:0"><span class="hint">Type:</span>'+MODES.map(m=>'<button class="fchip k-transport'+(repModes.includes(m[0])?' on':'')+'" data-act="repmode" data-mode="'+m[0]+'" aria-pressed="'+repModes.includes(m[0])+'">'+esc(m[1])+'</button>').join('')+'<button class="linkbtn" data-act="repmodeall">'+(repModes.length?'All types':'All types ✓')+'</button></div>':'')+
+    (repTab==='transport'?'<label class="chk">Validation <select id="rep_val">'+[['','All'],['yes','Validated'],['no','Not yet validated']].map(o=>'<option value="'+o[0]+'"'+(o[0]===repVal?' selected':'')+'>'+o[1]+'</option>').join('')+'</select></label>':'')+
     (repTab!=='stay'?'<label class="chk"><input type="checkbox" id="rep_all" '+(repAll?'checked':'')+'> Show everything, not just bookings</label>':'')+
     '<button class="btn" data-act="repcsv">Download CSV</button><button class="btn" data-act="repprint">Print</button></div>'+
-    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+(repTab==='food'&&repMeal?' — '+esc(BK_MEAL(repMeal)):'')+(repTab==='transport'&&repModes.length?' — '+esc(repModes.map(modeLabel).join(', ')):'')+'</h2><div class="rep-chips">'+chips+'</div>'+
+    '<div class="rep-head"><h2>'+esc(t.name)+' — '+R.label+(repTab!=='stay'&&!repAll?' bookings':'')+(repTab==='food'&&repMeal?' — '+esc(BK_MEAL(repMeal)):'')+(repTab==='transport'&&repVal?(repVal==='yes'?' — validated':' — not yet validated'):'')+(repTab==='transport'&&repModes.length?' — '+esc(repModes.map(modeLabel).join(', ')):'')+'</h2><div class="rep-chips">'+chips+'</div>'+
     (pa?'<div class="hint">Listed prices (first figure on each line; “pp” means per person): '+(pc?'<b>booked '+esc(pc)+'</b> · ':'')+'all listed '+esc(pa)+'</div>':'')+
     (gaps.length?'<div class="hint" style="color:var(--warn)">⚠ No accommodation for the night of '+gaps.map(d=>esc(fmtShort(d))).join(', ')+'</div>':'')+'</div>';
   if(!its.length)h+='<div class="empty"><p>Nothing to show here yet.'+(repTab!=='stay'&&!repAll?' Tick “Show everything” or change the filter to list every '+(repTab==='food'?'meal':'journey')+', or open an item and set its booking status.':'')+'</p></div>';
   else h+='<div class="rep-wrap"><table class="rep-t"><thead><tr>'+R.cols.map(c=>'<th>'+c[0]+'</th>').join('')+'</tr></thead><tbody>'+its.map(i=>'<tr class="k-'+i.type+'" data-act="open" data-id="'+esc(i.id)+'" tabindex="0">'+R.cols.map(c=>{
     const v=c[1](i)||'';
     if(c[0]==='Status')return '<td>'+(i.bk?'<span class="bk bk-'+i.bk+'">'+esc(v)+'</span>':'<span class="hint">—</span>')+'</td>';
+    if(c[0]==='Validated')return '<td>'+(i.valid?'<span class="bk bk-valid">✓</span>':'<span class="hint">—</span>')+'</td>';
     return '<td'+(/^(Accommodation|Restaurant|Journey)/.test(c[0])?' class="strong"':'')+'>'+esc(v)+'</td>';}).join('')+'</tr>').join('')+'</tbody></table></div>';
   h+=repUnmatchedHtml(repTab);
   $('#main').innerHTML=h+'</div>';
@@ -2079,6 +2083,7 @@ document.addEventListener('change',e=>{
   if(/^f_ll(from|to|via_\d+)?$/.test(t.id)){applyLL(t.id);return;}
   if(t.id==='f_type'){changeType(t.value);return;}
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
+  if(t.id==='rep_val'){repVal=t.value;renderAll();}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
   if(t.id==='map_tags'){mapTags=t.checked;try{localStorage.setItem('travel-mgr-maptags-v1',mapTags?'1':'0');}catch(x){}drawBigMap();}
   if(t.id==='rep_all'){repAll=t.checked;renderAll();}
