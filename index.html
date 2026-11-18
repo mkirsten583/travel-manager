@@ -190,6 +190,7 @@ dialog .toast{top:14px;bottom:auto}
 .rep-un{margin-top:14px;font-size:13px}.rep-un h4{margin:0 0 4px}.rep-un li{margin:2px 0}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
+.fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
 .calfilt{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.fchip{display:inline-flex;gap:5px;align-items:center;font:inherit;font-size:13px;font-weight:600;padding:3px 11px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;opacity:.7}.fchip.on{background:var(--k);color:var(--surface);border-color:var(--k);opacity:1}.fchip svg{width:14px;height:14px}
 .pinw{position:relative;width:22px;height:22px}.ptag{position:absolute;left:26px;top:50%;transform:translateY(-50%);background:var(--k,#2b6cb0);color:#fff;font:700 11px/1 system-ui,sans-serif;padding:3px 6px;border-radius:6px;white-space:nowrap;border:1px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45);pointer-events:none}
 </style>
@@ -1430,6 +1431,9 @@ function cardHtml(it,date){
 function renderEmpty(){
   $('#main').innerHTML='<div class="empty"><h2 style="margin:0 0 6px;color:var(--ink)">No trip yet</h2><p>Import an itinerary to build a day-by-day plan, or start an empty trip.</p><p><button class="btn primary" data-act="import">Import itinerary</button> <button class="btn" data-act="newtrip">New empty trip</button></p></div>';
 }
+let dayTypes=[];
+try{const s=JSON.parse(localStorage.getItem('travel-mgr-daytypes-v1')||'[]');if(Array.isArray(s))dayTypes=s;}catch(e){}
+const saveDayTypes=()=>{try{localStorage.setItem('travel-mgr-daytypes-v1',JSON.stringify(dayTypes));}catch(e){}};
 function renderDay(){
   const t=trip(),days=tripDays(t);
   if(!days.length){$('#main').innerHTML='<div class="empty"><p>This trip has no dates yet. Open <b>Trip</b> to set a start date, or import an itinerary.</p></div>';return;}
@@ -1437,12 +1441,25 @@ function renderDay(){
   let h='<div class="dayhead"><div class="row1"><button class="btn sm nop" data-act="prevday" '+(i<=0?'disabled':'')+'>‹</button><h2>Day '+(i+1)+' · '+esc(fmtLong(selDate))+'</h2><button class="btn sm nop" data-act="nextday" '+(i>=days.length-1?'disabled':'')+'>›</button></div>'+
     '<input class="dtitle" id="dayTitle" placeholder="Where / theme for the day (e.g. Tokyo – Asakusa & Ueno)" value="'+esc(dd.title||'')+'">'+
     '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>';
-  for(const ty of TYPES){
-    const its=itemsOnDay(selDate,ty.id);
-    if(ty.id==='other'&&!its.length)continue;
-    h+='<section class="sec k-'+ty.id+'"><header>'+ico(ty.icon)+'<span>'+ty.label+'</span><span class="cnt">'+(its.length?its.length:'')+'</span><span class="sp"></span><button class="btn sm" data-act="add" data-type="'+ty.id+'">+ Add</button></header>'+
-      (its.length?'<div class="list">'+its.map(x=>cardHtml(x,selDate)).join('')+'</div>':'<div class="none">Nothing planned.</div>')+'</section>';
+  /* one chronological list for the day; stays slot in at check-out (morning) / check-in (afternoon), or sit at the top while staying */
+  const ord=dayOrder(selDate),rows=[];
+  for(const it of tripItems()){
+    if(it.type==='stay'){
+      if(!(it.date&&it.date<=selDate&&selDate<=(it.endDate||it.date)))continue;
+      let k;
+      if(selDate===it.date&&it.endDate!==selDate)k=minOf(it.time||'15:00');
+      else if(selDate===it.endDate)k=minOf(it.endTime||'10:00');
+      else k=-1;
+      rows.push({it,k});
+    }else if(it.date===selDate)rows.push({it,k:ord.get(it.id)||0});
   }
+  rows.sort((a,b)=>a.k-b.k||(a.it.title||'').localeCompare(b.it.title||''));
+  const cnt={};rows.forEach(r=>cnt[r.it.type]=(cnt[r.it.type]||0)+1);
+  const sel=dayTypes.filter(x=>TYPE_BY_ID[x]);
+  h+='<div class="calfilt nop"><span class="hint">Show:</span><button class="fchip kall'+(sel.length?'':' on')+'" data-act="dayall" aria-pressed="'+!sel.length+'">All <span class="n">'+rows.length+'</span></button>'+
+    TYPES.map(ty=>'<button class="fchip k-'+ty.id+(sel.includes(ty.id)?' on':'')+'" data-act="daytype" data-type="'+ty.id+'" aria-pressed="'+sel.includes(ty.id)+'">'+ico(ty.icon)+ty.label+' <span class="n">'+(cnt[ty.id]||0)+'</span></button>').join('')+'</div>';
+  const shown=sel.length?rows.filter(r=>sel.includes(r.it.type)):rows;
+  h+=shown.length?'<div class="list daylist">'+shown.map(r=>cardHtml(r.it,selDate)).join('')+'</div>':'<div class="none">'+(rows.length?'Nothing of that kind on this day.':'Nothing planned.')+' Use <b>+ Add</b> in the top bar to add something.</div>';
   $('#main').innerHTML=h;
 }
 let calTypes={stay:true,food:true,activity:true,transport:true,other:true};
@@ -2094,6 +2111,8 @@ function onAct(el,e){
     case 'addmenu':{
       if(!trip()){toast('Create or import a trip first.');break;}
       const m=$('#addMenu');m.innerHTML=TYPES.map(t=>'<button class="k-'+t.id+'" data-act="add" data-type="'+t.id+'">'+ico(t.icon)+t.add+'</button>').join('');m.hidden=!m.hidden;e.stopPropagation();break;}
+    case 'daytype':{const k=dayTypes.indexOf(el.dataset.type);if(k<0)dayTypes.push(el.dataset.type);else dayTypes.splice(k,1);saveDayTypes();renderAll();break;}
+    case 'dayall':dayTypes=[];saveDayTypes();renderAll();break;
     case 'add':$('#addMenu').hidden=true;if(!trip()){toast('Create or import a trip first.');break;}openItem(null,el.dataset.type,selDate);break;
     case 'open':openItem(el.dataset.id);break;
     case 'goday':go(el.dataset.date);break;
