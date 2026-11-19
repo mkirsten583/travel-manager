@@ -127,7 +127,7 @@ dialog form,.dbody{display:flex;flex-direction:column;max-height:92vh}
 .df{display:flex;gap:8px;justify-content:flex-end;padding:11px 16px;border-top:1px solid var(--line);flex-wrap:wrap}
 .df .l{margin-right:auto}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.grid4{display:grid;grid-template-columns:1.3fr 1.2fr 1fr 1fr;gap:10px}
 .f{display:flex;flex-direction:column;gap:3px;font-size:12.5px;color:var(--muted);min-width:0}
 .f input,.f select,.f textarea{font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px;min-width:0;width:100%}
 .f textarea{min-height:90px;resize:vertical}
@@ -164,7 +164,7 @@ dialog .toast{top:14px;bottom:auto}
   .layout{grid-template-columns:1fr}
   .rail{position:static;max-height:none;display:flex;gap:6px;overflow-x:auto;padding:6px}
   .rd{min-width:132px}
-  .grid2,.grid3{grid-template-columns:1fr}
+  .grid2,.grid3{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}
   .cd{min-height:84px}.chip span{display:none}
 }
 @media print{
@@ -1606,7 +1606,7 @@ function renderItemDialog(first){
   const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',other:'Item / event',transport:'Service / description'}[d.type];
   let f=fld('Type','<select id="f_type">'+TYPES.map(x=>'<option value="'+x.id+'"'+(x.id===d.type?' selected':'')+'>'+x.label+'</option>').join('')+'</select>')+fld(titleLbl,inp('f_title',d.title));
   if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
-  else if(d.type==='food')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Time',inp('f_time',d.time,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else if(d.type==='food')f+='<div class="grid4">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='activity'||d.type==='other')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld(d.type==='other'?'Reference':'Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld(rail?'Service':'Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+(tr?'<label class="chk" style="margin-top:6px"><input type="checkbox" id="f_valid"'+(d.valid?' checked':'')+'> <b>✓ Validated</b> — route, times and booking checked</label>':'')+'</div>';
