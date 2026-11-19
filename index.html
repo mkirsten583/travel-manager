@@ -199,6 +199,7 @@ dialog .toast{top:14px;bottom:auto}
 .tl-bar{position:absolute;height:18px;border:0;border-radius:4px;color:#fff;font:inherit;font-size:11px;font-weight:600;padding:0 4px;cursor:pointer;overflow:hidden;white-space:nowrap;text-align:left;box-shadow:0 0 0 1px var(--surface)}.tl-bar span{pointer-events:none}.tl-bar.sh{overflow:visible}.tl-bar.sh span{position:absolute;left:100%;margin-left:4px;color:var(--ink);font-weight:500}.tl-bar:hover{filter:brightness(1.12)}
 .tl-no{position:absolute;top:4px;width:12px;height:12px;border:2px solid;border-radius:3px;background:var(--surface);padding:0;cursor:pointer}
 .tl-lanes{position:relative}.tl-gap{position:absolute;top:0;bottom:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,rgba(224,160,0,.30) 0 6px,rgba(224,160,0,.12) 6px 12px);border-left:2px solid #d99a00;border-right:2px solid #d99a00;display:flex;align-items:center;justify-content:center}.tl-gap span{background:#fff3cf;color:#7a5200;font-size:11px;font-weight:700;padding:0 5px;border-radius:999px;white-space:nowrap}.tl-bar,.tl-no{z-index:2}.tl-lab u{font-size:11px;color:#a86b00;text-decoration:none;font-weight:700}.tl-emp{background:repeating-linear-gradient(135deg,rgba(224,160,0,.16) 0 6px,transparent 6px 12px)}
+.daygap{border:2px dashed #d99a00;background:repeating-linear-gradient(135deg,rgba(224,160,0,.18) 0 6px,rgba(224,160,0,.06) 6px 12px);color:#7a5200;font-size:13px;font-weight:700;text-align:center;padding:5px 8px;border-radius:8px;margin:2px 0}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
 .fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
@@ -1475,7 +1476,21 @@ function renderDay(){
   h+='<div class="calfilt nop"><span class="hint">Show:</span><button class="fchip kall'+(sel.length?'':' on')+'" data-act="dayall" aria-pressed="'+!sel.length+'">All <span class="n">'+rows.length+'</span></button>'+
     TYPES.map(ty=>'<button class="fchip k-'+ty.id+(sel.includes(ty.id)?' on':'')+'" data-act="daytype" data-type="'+ty.id+'" aria-pressed="'+sel.includes(ty.id)+'">'+ico(ty.icon)+ty.label+' <span class="n">'+(cnt[ty.id]||0)+'</span></button>').join('')+'</div>';
   const shown=sel.length?rows.filter(r=>sel.includes(r.it.type)):rows;
-  h+=shown.length?'<div class="list daylist">'+shown.map(r=>cardHtml(r.it,selDate)).join('')+'</div>':'<div class="none">'+(rows.length?'Nothing of that kind on this day.':'Nothing planned.')+' Use <b>+ Add</b> in the top bar to add something.</div>';
+  const gapOpts='<label class="chk"><input type="checkbox" id="tl_gaps"'+(tlGap.on?' checked':'')+'> Highlight gaps of</label><select id="tl_min" class="btn" style="padding:3px 6px">'+[[60,'1 hour'],[90,'1.5 hours'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours']].map(o=>'<option value="'+o[0]+'"'+(o[0]===tlGap.min?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><span class="hint">or more</span>';
+  h=h.replace(/<\/div>$/,'<span class="sp"></span>'+gapOpts+'</div>');
+  let gapAt=[];
+  if(tlGap.on){
+    const G=tlGaps(rows.map(r=>r.it).filter(i=>i.type!=='stay'));
+    if(G.empty&&shown.length)h+='<div class="daygap">No timed items on this day</div>';
+    gapAt=G.gaps.slice();
+  }
+  const cards=[];
+  shown.forEach(r=>{
+    const s=r.it.type==='stay'?null:minOf(r.it.time);
+    while(gapAt.length&&s!=null&&s>=gapAt[0][1]){const g=gapAt.shift();cards.push('<div class="daygap">Gap '+hhmm(g[0])+' – '+hhmm(g[1])+' · '+durTxt(g[1]-g[0])+' with nothing on</div>');}
+    cards.push(cardHtml(r.it,selDate));
+  });
+  h+=shown.length?'<div class="list daylist">'+cards.join('')+'</div>':'<div class="none">'+(rows.length?'Nothing of that kind on this day.':'Nothing planned.')+' Use <b>+ Add</b> in the top bar to add something.</div>';
   $('#main').innerHTML=h;
 }
 let calTypes={stay:true,food:true,activity:true,transport:true,other:true};
@@ -2386,7 +2401,7 @@ document.addEventListener('change',e=>{
   if(t.id==='f_mode'&&ed&&ed.draft.type==='transport'){readForm();renderItemDialog(false);return;}
   if(t.id==='rep_val'){repVal=t.value;renderAll();}
   if(t.id==='rep_meal'){repMeal=t.value;renderAll();}
-  if(t.id==='tl_gaps'||t.id==='tl_min'){tlGap.on=$('#tl_gaps').checked;tlGap.min=+$('#tl_min').value||120;try{localStorage.setItem('travel-mgr-tlgaps-v1',JSON.stringify(tlGap));}catch(x){}renderTimeline();return;}
+  if(t.id==='tl_gaps'||t.id==='tl_min'){tlGap.on=$('#tl_gaps').checked;tlGap.min=+$('#tl_min').value||120;try{localStorage.setItem('travel-mgr-tlgaps-v1',JSON.stringify(tlGap));}catch(x){}renderAll();return;}
   if(t.id==='map_tags'){mapTags=t.checked;try{localStorage.setItem('travel-mgr-maptags-v1',mapTags?'1':'0');}catch(x){}drawBigMap();}
   if(t.id==='rep_all'){repAll=t.checked;renderAll();}
   if(t.id==='i_day'){imp.day=t.value;runImportPreview(true);return;}
