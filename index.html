@@ -197,7 +197,7 @@ dialog .toast{top:14px;bottom:auto}
 .tl-lanes{display:flex;flex-direction:column;gap:2px;min-width:0}.tl-track{position:relative}.tl-lane .tl-track{background:var(--wk);border-radius:4px}
 .tl-g{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.55}.tl-g.b{opacity:1}
 .tl-bar{position:absolute;height:18px;border:0;border-radius:4px;color:#fff;font:inherit;font-size:11px;font-weight:600;padding:0 4px;cursor:pointer;overflow:hidden;white-space:nowrap;text-align:left;box-shadow:0 0 0 1px var(--surface)}.tl-bar span{pointer-events:none}.tl-bar.sh{overflow:visible}.tl-bar.sh span{position:absolute;left:100%;margin-left:4px;color:var(--ink);font-weight:500}.tl-bar:hover{filter:brightness(1.12)}
-.tl-nolist{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}.tl-no{font:inherit;font-size:11px;background:var(--surface);border:1px dashed;border-radius:999px;padding:0 7px;cursor:pointer}
+.tl-no{position:absolute;top:4px;width:12px;height:12px;border:2px solid;border-radius:3px;background:var(--surface);padding:0;cursor:pointer}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
 .fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
@@ -2105,8 +2105,8 @@ function tlBars(items,type){
     bars.push({it,s,e,l,w,sh:w<9,ext:w<9?Math.min(100-l,(w+(String(it.title||'').length*0.62+0.8))):w});
   });
   bars.sort((x,y)=>x.s-y.s);
-  const ends=[];                           /* greedy packing so overlapping items sit on their own sub-row */
-  bars.forEach(b=>{let r=ends.findIndex(x=>x<=b.l+0.05);if(r<0){r=ends.length;ends.push(0);}ends[r]=b.l+b.ext;b.row=r;});
+  bars.forEach(b=>b.row=0);
+  const ends=[0];                           /* greedy packing so overlapping items sit on their own sub-row */
   return {bars,none,rows:Math.max(1,ends.length)};
 }
 function renderTimeline(){
@@ -2114,15 +2114,15 @@ function renderTimeline(){
   const hrs=[];for(let m=TL_START;m<=TL_END;m+=60)hrs.push(m);
   const head='<div class="tl-row tl-hd"><div class="tl-lab"></div><div class="tl-track">'+hrs.map(m=>'<span class="tl-h" style="left:'+((m-TL_START)/TL_SPAN*100)+'%">'+(m===1440?'12am':m===720?'12pm':m>720?(m/60-12)+'pm':(m/60)+'am')+'</span>').join('')+'</div></div>';
   const grid=hrs.map(m=>'<i class="tl-g'+(m%360===0?' b':'')+'" style="left:'+((m-TL_START)/TL_SPAN*100)+'%"></i>').join('');
-  const legend='<div class="calfilt">'+TL_LANES.map(l=>'<span class="tl-key"><i style="background:var('+l[2]+')"></i>'+l[1]+'</span>').join('')+'<span class="hint">Click a bar to edit it, a day to open it. Times before 5am show at the right edge. Items with no time are listed at the end of their lane.</span></div>';
+  const legend='<div class="calfilt">'+TL_LANES.map(l=>'<span class="tl-key"><i style="background:var('+l[2]+')"></i>'+l[1]+'</span>').join('')+'<span class="hint">Click a bar to edit it, a day to open it. Times before 5am show at the right edge. Hover a bar to see what it is. Hollow squares at the left of a lane are items with no time.</span></div>';
   const body=days.map((d,ix)=>{
     const dayItems=items.filter(i=>i.type!=='stay'&&i.date===d);
     const stay=items.find(i=>i.type==='stay'&&i.date&&i.date<=d&&d<(i.endDate||i.date))||items.find(i=>i.type==='stay'&&i.endDate===d);
     const lanes=TL_LANES.map(([ty,lab,cv])=>{
       const r=tlBars(dayItems,ty);
-      const bars=r.bars.map(b=>'<button type="button" class="tl-bar'+(b.sh?' sh':'')+'" data-act="open" data-id="'+esc(b.it.id)+'" style="left:'+b.l+'%;width:'+b.w+'%;top:'+(b.row*20+1)+'px;background:var('+cv+')" title="'+esc(hhmm(b.s)+(b.it.endTime?'–'+b.it.endTime:'')+'  '+(b.it.title||''))+'"><span>'+esc(b.it.title||'')+'</span></button>').join('');
-      const none=r.none.map(i=>'<button type="button" class="tl-no" data-act="open" data-id="'+esc(i.id)+'" style="border-color:var('+cv+');color:var('+cv+')" title="No time set">'+esc(i.title||'')+'</button>').join('');
-      return '<div class="tl-lane"><div class="tl-track" style="height:'+(r.rows*20+2)+'px">'+grid+bars+'</div>'+(none?'<div class="tl-nolist">'+none+'</div>':'')+'</div>';
+      const bars=r.bars.map(b=>'<button type="button" class="tl-bar'+(b.sh?' sh':'')+'" data-act="open" data-id="'+esc(b.it.id)+'" style="left:'+b.l+'%;width:'+b.w+'%;top:1px;background:var('+cv+')" title="'+esc(hhmm(b.s)+(b.it.endTime?'–'+b.it.endTime:'')+'  '+(b.it.title||''))+'"></button>').join('');
+      const none=r.none.map((i,k)=>'<button type="button" class="tl-no" data-act="open" data-id="'+esc(i.id)+'" style="left:'+(k*16+2)+'px;border-color:var('+cv+')" title="'+esc('No time set  '+(i.title||''))+'"></button>').join('');
+      return '<div class="tl-lane"><div class="tl-track" style="height:20px">'+grid+bars+none+'</div></div>';
     }).join('');
     return '<div class="tl-row tl-day"><button type="button" class="tl-lab" data-act="godate" data-date="'+esc(d)+'"><b>Day '+(ix+1)+'</b><span>'+esc(fmtShort(d))+'</span>'+(stay?'<em>'+esc(stay.title||'')+'</em>':'')+'</button><div class="tl-lanes">'+lanes+'</div></div>';
   }).join('');
