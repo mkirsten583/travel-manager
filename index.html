@@ -189,6 +189,15 @@ dialog .toast{top:14px;bottom:auto}
 .rep-t td.strong{font-weight:650;min-width:150px}
 .rep-t tbody tr{cursor:pointer}.rep-t tbody tr:hover{background:#8881}
 .rep-un{margin-top:14px;font-size:13px}.rep-un h4{margin:0 0 4px}.rep-un li{margin:2px 0}
+.tl-title{margin:0 0 6px;font-size:18px}.tl-key{display:inline-flex;gap:5px;align-items:center;font-size:13px;font-weight:600}.tl-key i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.tl-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}.tl{min-width:900px;padding:6px 8px 10px}
+.tl-row{display:grid;grid-template-columns:128px 1fr;gap:8px;align-items:stretch}.tl-hd{position:sticky;top:0;background:var(--surface);z-index:2}.tl-hd .tl-track{height:22px}
+.tl-h{position:absolute;top:3px;transform:translateX(-50%);font-size:11px;color:var(--muted);white-space:nowrap}.tl-hd .tl-h:first-child{transform:none}.tl-hd .tl-h:last-child{transform:translateX(-100%)}
+.tl-day{border-top:1px solid var(--line);padding:5px 0}.tl-lab{font:inherit;text-align:left;background:none;border:0;cursor:pointer;padding:2px 4px;border-radius:6px;display:flex;flex-direction:column;gap:1px;color:var(--ink)}.tl-lab:hover{background:var(--wk)}.tl-lab b{font-size:13px}.tl-lab span{font-size:12px;color:var(--muted)}.tl-lab em{font-size:11px;color:var(--c-stay);font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tl-lanes{display:flex;flex-direction:column;gap:2px;min-width:0}.tl-track{position:relative}.tl-lane .tl-track{background:var(--wk);border-radius:4px}
+.tl-g{position:absolute;top:0;bottom:0;width:1px;background:var(--line);opacity:.55}.tl-g.b{opacity:1}
+.tl-bar{position:absolute;height:18px;border:0;border-radius:4px;color:#fff;font:inherit;font-size:11px;font-weight:600;padding:0 4px;cursor:pointer;overflow:hidden;white-space:nowrap;text-align:left;box-shadow:0 0 0 1px var(--surface)}.tl-bar span{pointer-events:none}.tl-bar.sh{overflow:visible}.tl-bar.sh span{position:absolute;left:100%;margin-left:4px;color:var(--ink);font-weight:500}.tl-bar:hover{filter:brightness(1.12)}
+.tl-nolist{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}.tl-no{font:inherit;font-size:11px;background:var(--surface);border:1px dashed;border-radius:999px;padding:0 7px;cursor:pointer}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
 .fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
@@ -204,12 +213,13 @@ dialog .toast{top:14px;bottom:auto}
     <h1>Travel manager</h1>
     <select id="tripSel" aria-label="Trip"></select>
     <div class="seg" id="viewSeg">
-      <button data-view="day">Day</button><button data-view="map">Map</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
+      <button data-view="day">Day</button><button data-view="timeline">Timeline</button><button data-view="map">Map</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
     </div>
     <span class="sp"></span>
     <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
     <div class="menuwrap"><button class="btn primary" data-act="addmenu">+ Add</button><div class="menu" id="addMenu" hidden></div></div>
-    <button class="btn" data-act="print" title="Print or save as PDF">Print</button>
+    <button class="btn" data-act="exportpdf" title="Download the itinerary as a PDF file">Export PDF</button>
+    <button class="btn" data-act="print" title="Print this view">Print</button>
     <button class="btn" data-act="trip">Trip</button>
     <button class="pill" id="pill" data-act="data" title="Data &amp; sync"><i class="sd"></i><span class="tx">Local only</span></button>
   </div>
@@ -1432,6 +1442,21 @@ function cardHtml(it,date){
 function renderEmpty(){
   $('#main').innerHTML='<div class="empty"><h2 style="margin:0 0 6px;color:var(--ink)">No trip yet</h2><p>Import an itinerary to build a day-by-day plan, or start an empty trip.</p><p><button class="btn primary" data-act="import">Import itinerary</button> <button class="btn" data-act="newtrip">New empty trip</button></p></div>';
 }
+/* the day's items in chronological order; stays slot in at check-out (morning) / check-in (afternoon), or sit at the top while staying */
+function dayRows(date){
+  const ord=dayOrder(date),rows=[];
+  for(const it of tripItems()){
+    if(it.type==='stay'){
+      if(!(it.date&&it.date<=date&&date<=(it.endDate||it.date)))continue;
+      let k;
+      if(date===it.date&&it.endDate!==date)k=minOf(it.time||'15:00');
+      else if(date===it.endDate)k=minOf(it.endTime||'10:00');
+      else k=-1;
+      rows.push({it,k});
+    }else if(it.date===date)rows.push({it,k:ord.get(it.id)||0});
+  }
+  return rows.sort((a,b)=>a.k-b.k||(a.it.title||'').localeCompare(b.it.title||''));
+}
 let dayTypes=[];
 try{const s=JSON.parse(localStorage.getItem('travel-mgr-daytypes-v1')||'[]');if(Array.isArray(s))dayTypes=s;}catch(e){}
 const saveDayTypes=()=>{try{localStorage.setItem('travel-mgr-daytypes-v1',JSON.stringify(dayTypes));}catch(e){}};
@@ -1443,18 +1468,7 @@ function renderDay(){
     '<input class="dtitle" id="dayTitle" placeholder="Where / theme for the day (e.g. Tokyo – Asakusa & Ueno)" value="'+esc(dd.title||'')+'">'+
     '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>';
   /* one chronological list for the day; stays slot in at check-out (morning) / check-in (afternoon), or sit at the top while staying */
-  const ord=dayOrder(selDate),rows=[];
-  for(const it of tripItems()){
-    if(it.type==='stay'){
-      if(!(it.date&&it.date<=selDate&&selDate<=(it.endDate||it.date)))continue;
-      let k;
-      if(selDate===it.date&&it.endDate!==selDate)k=minOf(it.time||'15:00');
-      else if(selDate===it.endDate)k=minOf(it.endTime||'10:00');
-      else k=-1;
-      rows.push({it,k});
-    }else if(it.date===selDate)rows.push({it,k:ord.get(it.id)||0});
-  }
-  rows.sort((a,b)=>a.k-b.k||(a.it.title||'').localeCompare(b.it.title||''));
+  const rows=dayRows(selDate);
   const cnt={};rows.forEach(r=>cnt[r.it.type]=(cnt[r.it.type]||0)+1);
   const sel=dayTypes.filter(x=>TYPE_BY_ID[x]);
   h+='<div class="calfilt nop"><span class="hint">Show:</span><button class="fchip kall'+(sel.length?'':' on')+'" data-act="dayall" aria-pressed="'+!sel.length+'">All <span class="n">'+rows.length+'</span></button>'+
@@ -1563,8 +1577,8 @@ function renderAll(){
   else{
     renderRail();
     if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
-    ({day:renderDay,map:renderMapView,reports:renderReports}[view]||renderDay)();
-    $('.layout').classList.toggle('rep',view==='reports');
+    ({day:renderDay,timeline:renderTimeline,map:renderMapView,reports:renderReports}[view]||renderDay)();
+    $('.layout').classList.toggle('rep',view==='reports'||view==='timeline');
   }
   $('#foot').textContent='Version '+VERSION;
 }
@@ -2072,6 +2086,167 @@ async function deleteNote(){
   const n=ed.orig;ed.saved=true;$('#dlg').close();
   n.atts.forEach(removeAttFiles);data.notes=data.notes.filter(x=>x.id!==n.id);changed();renderAll();toast('Note deleted.');
 }
+/* ============ TIMELINE VIEW: one row per day, hours across, a lane per event type ============ */
+const TL_START=300,TL_END=1440,TL_SPAN=TL_END-TL_START;
+const TL_LANES=[['activity','Activities','--c-act'],['food','Meals','--c-food'],['transport','Travel','--c-trans'],['other','Other','--c-other']];
+const TL_DUR={activity:60,food:60,transport:30,other:30};
+const hhmm=m=>{m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
+function tlBars(items,type){
+  const bars=[],none=[];
+  items.filter(i=>i.type===type).forEach(it=>{
+    const s=minOf(it.time);
+    if(s==null){none.push(it);return;}
+    let e=minOf(it.endTime);
+    if(e==null||e<=s)e=s+(TL_DUR[type]||60);
+    const a=Math.max(s,TL_START),b=Math.min(e,TL_END);
+    let l=(a-TL_START)/TL_SPAN*100,w=(b-a)/TL_SPAN*100;
+    if(b<=a){l=100-0.8;w=0.8;}           /* after midnight: pinned to the right edge */
+    w=Math.max(w,0.8);if(l+w>100)l=100-w;
+    bars.push({it,s,e,l,w,sh:w<9,ext:w<9?Math.min(100-l,(w+(String(it.title||'').length*0.62+0.8))):w});
+  });
+  bars.sort((x,y)=>x.s-y.s);
+  const ends=[];                           /* greedy packing so overlapping items sit on their own sub-row */
+  bars.forEach(b=>{let r=ends.findIndex(x=>x<=b.l+0.05);if(r<0){r=ends.length;ends.push(0);}ends[r]=b.l+b.ext;b.row=r;});
+  return {bars,none,rows:Math.max(1,ends.length)};
+}
+function renderTimeline(){
+  const t=trip(),days=tripDays(t),items=tripItems();
+  const hrs=[];for(let m=TL_START;m<=TL_END;m+=60)hrs.push(m);
+  const head='<div class="tl-row tl-hd"><div class="tl-lab"></div><div class="tl-track">'+hrs.map(m=>'<span class="tl-h" style="left:'+((m-TL_START)/TL_SPAN*100)+'%">'+(m===1440?'12am':m===720?'12pm':m>720?(m/60-12)+'pm':(m/60)+'am')+'</span>').join('')+'</div></div>';
+  const grid=hrs.map(m=>'<i class="tl-g'+(m%360===0?' b':'')+'" style="left:'+((m-TL_START)/TL_SPAN*100)+'%"></i>').join('');
+  const legend='<div class="calfilt">'+TL_LANES.map(l=>'<span class="tl-key"><i style="background:var('+l[2]+')"></i>'+l[1]+'</span>').join('')+'<span class="hint">Click a bar to edit it, a day to open it. Times before 5am show at the right edge. Items with no time are listed at the end of their lane.</span></div>';
+  const body=days.map((d,ix)=>{
+    const dayItems=items.filter(i=>i.type!=='stay'&&i.date===d);
+    const stay=items.find(i=>i.type==='stay'&&i.date&&i.date<=d&&d<(i.endDate||i.date))||items.find(i=>i.type==='stay'&&i.endDate===d);
+    const lanes=TL_LANES.map(([ty,lab,cv])=>{
+      const r=tlBars(dayItems,ty);
+      const bars=r.bars.map(b=>'<button type="button" class="tl-bar'+(b.sh?' sh':'')+'" data-act="open" data-id="'+esc(b.it.id)+'" style="left:'+b.l+'%;width:'+b.w+'%;top:'+(b.row*20+1)+'px;background:var('+cv+')" title="'+esc(hhmm(b.s)+(b.it.endTime?'–'+b.it.endTime:'')+'  '+(b.it.title||''))+'"><span>'+esc(b.it.title||'')+'</span></button>').join('');
+      const none=r.none.map(i=>'<button type="button" class="tl-no" data-act="open" data-id="'+esc(i.id)+'" style="border-color:var('+cv+');color:var('+cv+')" title="No time set">'+esc(i.title||'')+'</button>').join('');
+      return '<div class="tl-lane"><div class="tl-track" style="height:'+(r.rows*20+2)+'px">'+grid+bars+'</div>'+(none?'<div class="tl-nolist">'+none+'</div>':'')+'</div>';
+    }).join('');
+    return '<div class="tl-row tl-day"><button type="button" class="tl-lab" data-act="godate" data-date="'+esc(d)+'"><b>Day '+(ix+1)+'</b><span>'+esc(fmtShort(d))+'</span>'+(stay?'<em>'+esc(stay.title||'')+'</em>':'')+'</button><div class="tl-lanes">'+lanes+'</div></div>';
+  }).join('');
+  $('#main').innerHTML='<h2 class="tl-title">'+esc(t.name)+' — timeline</h2>'+legend+'<div class="tl-wrap"><div class="tl">'+head+body+'</div></div>';
+}
+/* ============ EXPORT ITINERARY TO PDF ============ */
+const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+let jspdfReady=null;
+function loadJsPdf(){
+  if(window.jspdf&&window.jspdf.jsPDF)return Promise.resolve(window.jspdf.jsPDF);
+  if(jspdfReady)return jspdfReady;
+  jspdfReady=new Promise((res,rej)=>{
+    const s=document.createElement('script');s.src=JSPDF_URL;
+    s.onload=()=>window.jspdf&&window.jspdf.jsPDF?res(window.jspdf.jsPDF):(jspdfReady=null,rej(new Error('the PDF writer did not start')));
+    s.onerror=()=>{jspdfReady=null;rej(new Error('the PDF writer could not be loaded (it needs an internet connection the first time)'));};
+    document.head.appendChild(s);
+  });
+  return jspdfReady;
+}
+/* the built-in PDF fonts only hold Western characters: swap common symbols, drop emoji, mark anything else with ? */
+function pdfText(s){
+  return String(s==null?'':s).replace(/[→⇒➜]/g,'->').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[✓✔✅]/g,'[ok]').replace(/[   ]/g,' ')
+    .replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍]/gu,'').replace(/[^\x09\x0A\x20-\x7E¡-ÿ]/g,'?').replace(/[ \t]+/g,' ').trim();
+}
+const PDF_RGB={stay:[138,90,43],food:[192,86,42],activity:[142,68,173],transport:[43,108,176],other:[91,112,131]};
+function pdfItemLines(it,date,o){
+  const lines=[];
+  const bits=[];
+  if(it.type==='transport'){
+    if(it.from||it.to)bits.push((it.from||'?')+' -> '+(it.to||'?'));
+    const m=modeLabel(it.mode);if(m)bits.push(m);if(it.svc)bits.push(it.svc);
+  }else if(it.type==='food'){
+    const ml=(MEALS.find(x=>x[0]===it.meal)||[])[1];if(ml&&it.meal)bits.push(ml);if(it.place)bits.push(it.place);
+  }else if(it.type==='stay'){
+    if(it.address||it.place)bits.push(it.address||it.place);
+    if(date===it.date&&it.endDate)bits.push('until '+fmtShort(it.endDate));
+  }else if(it.place)bits.push(it.place);
+  if(bits.length)lines.push(bits.join('  |  '));
+  if(o.bookings){
+    const rail=it.type==='transport'&&(it.mode==='train'||it.mode==='subway'),b=[];
+    if(it.bk&&BK_LABEL[it.bk])b.push(BK_LABEL[it.bk]);
+    if(it.ref)b.push((it.type==='transport'&&rail?'Service ':'Ref ')+it.ref);
+    if(it.price)b.push((rail?'Booking no. ':'')+it.price);
+    if(it.how)b.push(it.how);
+    if(it.bkNote)b.push(it.bkNote);
+    if(it.type==='transport'&&it.valid)b.push('Validated');
+    if(b.length)lines.push(b.join('  |  '));
+  }
+  if(o.notes&&it.notes&&it.notes.trim())lines.push('Notes: '+it.notes.trim());
+  return lines.map(pdfText).filter(Boolean);
+}
+async function exportPdf(o){
+  const t=trip();if(!t){toast('Create or import a trip first.');return;}
+  let JsPDF;
+  try{JsPDF=await loadJsPdf();}catch(e){toast('Could not make the PDF: '+e.message+'.');return;}
+  const days=o.dayOnly?[selDate]:tripDays(t);
+  const doc=new JsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+  const W=210,H=297,M=14,TW=22,BODY=W-2*M-TW-4;let y=M;
+  const need=h=>{if(y+h>H-M-6){doc.addPage();y=M;}};
+  const text=(s,x,size,style,rgb,w)=>{doc.setFont('helvetica',style||'normal');doc.setFontSize(size);doc.setTextColor(...(rgb||[30,30,30]));const ls=w?doc.splitTextToSize(s,w):[s];ls.forEach((l,i)=>doc.text(l,x,y+i*size*0.42));return ls.length;};
+  /* title block */
+  text(pdfText(t.name||'Itinerary'),M,20,'bold');y+=9;
+  const rng=tripRange(t),sub=[rng.start?fmtShort(rng.start)+' - '+fmtShort(rng.end):'',t.region||''].filter(Boolean).join('   |   ');
+  if(sub){text(pdfText(sub),M,10.5,'normal',[90,90,90]);y+=6;}
+  text('Created '+new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'}),M,8.5,'normal',[130,130,130]);y+=8;
+  doc.setDrawColor(200);doc.line(M,y-3,W-M,y-3);
+  days.forEach(d=>{
+    const idx=tripDays(t).indexOf(d),dd=t.days[d]||{};
+    const rows=dayRows(d).filter(r=>!o.types||o.types.includes(r.it.type));
+    need(26);
+    doc.setFillColor(236,240,244);doc.rect(M,y-4.6,W-2*M,8,'F');
+    text(pdfText('Day '+(idx+1)+'  -  '+fmtLong(d)+(dd.title?'  -  '+dd.title:'')),M+2,11.5,'bold');y+=7;
+    if(o.notes&&dd.notes&&dd.notes.trim()){const n=text(pdfText(dd.notes.trim()),M+2,9,'italic',[90,90,90],W-2*M-4);y+=n*3.9+1.5;}
+    if(!rows.length){text('Nothing planned.',M+TW+2,9,'italic',[130,130,130]);y+=7;return;}
+    rows.forEach(({it})=>{
+      const col=PDF_RGB[it.type]||PDF_RGB.other;
+      let tm='';
+      if(it.type==='stay'){tm=d===it.date?(it.time||''):d===it.endDate?(it.endTime||''):'';}
+      else tm=it.time?(it.time+(it.endTime?'-'+it.endTime:'')):(it.slot||'');
+      let tag='';if(it.type==='stay')tag=d===it.date?'Check-in':d===it.endDate?'Check-out':'Staying';
+      const title=pdfText(it.title+(tag?'  ['+tag+']':''));
+      const lines=pdfItemLines(it,d,o);
+      doc.setFontSize(10);const tl=doc.splitTextToSize(title,BODY);
+      let h=tl.length*4.4+1;
+      const wrapped=lines.map(l=>{doc.setFontSize(8.5);return doc.splitTextToSize(l,BODY);});
+      wrapped.forEach(w=>h+=w.length*3.6);
+      h+=2.2;need(h);
+      doc.setFillColor(...col);doc.rect(M,y-3.6,1.2,h-1,'F');
+      text(pdfText(tm),M+3,9,'bold',col);
+      doc.setFont('helvetica','bold');doc.setFontSize(10);doc.setTextColor(25,25,25);tl.forEach((l,i)=>doc.text(l,M+TW+2,y+i*4.4));
+      let yy=y+tl.length*4.4;
+      wrapped.forEach((w,k)=>{doc.setFont('helvetica',lines[k].startsWith('Notes:')?'italic':'normal');doc.setFontSize(8.5);doc.setTextColor(95,95,95);w.forEach((l,i)=>doc.text(l,M+TW+2,yy+i*3.6));yy+=w.length*3.6;});
+      y+=h;
+    });
+    y+=3;
+  });
+  const n=doc.getNumberOfPages();
+  for(let p=1;p<=n;p++){doc.setPage(p);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(140,140,140);doc.text(pdfText(t.name||'Itinerary')+'   -   page '+p+' of '+n,W/2,H-7,{align:'center'});}
+  const safe=(t.name||'itinerary').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'-')||'itinerary';
+  const fname=safe+(o.dayOnly?'-'+selDate:'')+'.pdf';
+  doc.save(fname);
+  toast('PDF saved as '+fname+'.');
+}
+function openExportPdf(){
+  const t=trip();if(!t){toast('Create or import a trip first.');return;}
+  const dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh"><span>Export itinerary to PDF</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    '<label class="chk"><input type="radio" name="x_scope" id="x_all" checked> Whole trip ('+tripDays(t).length+' days)</label>'+
+    '<label class="chk"><input type="radio" name="x_scope" id="x_day"> Just this day ('+esc(fmtShort(selDate||''))+')</label>'+
+    '<div class="hint" style="margin:10px 0 4px">Include</div>'+
+    TYPES.map(ty=>'<label class="chk"><input type="checkbox" class="x_type" value="'+ty.id+'" checked> '+esc(ty.label)+'</label>').join('')+
+    '<label class="chk" style="margin-top:8px"><input type="checkbox" id="x_book" checked> Booking details (status, reference, price, how to book)</label>'+
+    '<label class="chk"><input type="checkbox" id="x_notes" checked> Notes</label>'+
+    '<div class="hint" style="margin-top:10px">Items are listed in time order. Letters the PDF font cannot show (for example Japanese characters) appear as “?”.</div>'+
+    '</div><div class="df"><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="doexportpdf">Download PDF</button></div></div>';
+  dlg.onclose=null;if(!dlg.open)dlg.showModal();
+}
+async function doExportPdf(){
+  const o={dayOnly:$('#x_day').checked,types:[...document.querySelectorAll('.x_type')].filter(c=>c.checked).map(c=>c.value),bookings:$('#x_book').checked,notes:$('#x_notes').checked};
+  if(!o.types.length){toast('Tick at least one kind of item to include.');return;}
+  const btn=document.querySelector('[data-act=doexportpdf]');if(btn){btn.disabled=true;btn.textContent='Making PDF…';}
+  try{await exportPdf(o);$('#dlg').close();}
+  catch(e){toast('Could not make the PDF: '+(e&&e.message||e));if(btn){btn.disabled=false;btn.textContent='Download PDF';}}
+}
 
 /* ============ EVENTS ============ */
 function go(date){selDate=date;view='day';try{localStorage.setItem(LS_VIEW,view);}catch(e){}renderAll();window.scrollTo({top:0});}
@@ -2109,6 +2284,8 @@ function onAct(el,e){
     case 'trip':trip()?openTrip(false):openTrip(true);break;
     case 'data':openData();break;
     case 'print':window.print();break;
+    case 'exportpdf':openExportPdf();break;
+    case 'doexportpdf':doExportPdf();break;
     case 'addmenu':{
       if(!trip()){toast('Create or import a trip first.');break;}
       const m=$('#addMenu');m.innerHTML=TYPES.map(t=>'<button class="k-'+t.id+'" data-act="add" data-type="'+t.id+'">'+ico(t.icon)+t.add+'</button>').join('');m.hidden=!m.hidden;e.stopPropagation();break;}
@@ -2116,6 +2293,7 @@ function onAct(el,e){
     case 'dayall':dayTypes=[];saveDayTypes();renderAll();break;
     case 'add':$('#addMenu').hidden=true;if(!trip()){toast('Create or import a trip first.');break;}openItem(null,el.dataset.type,selDate);break;
     case 'open':openItem(el.dataset.id);break;
+    case 'godate':go(el.dataset.date);break;
     case 'goday':go(el.dataset.date);break;
     case 'prevday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i>0){selDate=d[i-1];renderAll();}break;}
     case 'nextday':{const d=tripDays(trip());const i=d.indexOf(selDate);if(i<d.length-1){selDate=d[i+1];renderAll();}break;}
@@ -2246,7 +2424,7 @@ window.__travel={geoCands,geoFind,geoClean,openNote,renderNotes,srcById,attBlob,
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
   try{selTrip=localStorage.getItem(LS_SEL);view=localStorage.getItem(LS_VIEW)||'day';}catch(e){}
-  if(!['day','map','reports','notes'].includes(view))view='day';
+  if(!['day','timeline','map','reports','notes'].includes(view))view='day';
   renderAll();setStatus('local');
   if(msalConfigured()&&window.msal){
     try{
