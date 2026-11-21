@@ -13,14 +13,14 @@
 :root{
   --bg:#edf0f3; --surface:#fff; --wk:#f5f7f9; --ink:#15212b; --muted:#5a6773; --line:#d3dae1; --hover:#e8edf1;
   --danger:#b3261e; --ok:#2e7d4f; --warn:#b26a00;
-  --c-stay:#8a5a2b; --c-food:#c0562a; --c-act:#8e44ad; --c-trans:#2b6cb0; --c-other:#5b7083;
+  --c-stay:#8a5a2b; --c-food:#c0562a; --c-act:#8e44ad; --c-trans:#2b6cb0; --c-other:#5b7083; --c-ph:#1f8a70;
 }
 @media (prefers-color-scheme:dark){
   :root{--bg:#11161b; --surface:#1a2129; --wk:#171d24; --ink:#e7ecf0; --muted:#94a1ad; --line:#2d3740; --hover:#242e37;
     --danger:#ff8a80; --ok:#7ad39c; --warn:#f0b85a;
-    --c-stay:#d9a56b; --c-food:#f09a70; --c-act:#cf9de6; --c-trans:#7db4ff; --c-other:#a9b8c6;}
+    --c-stay:#d9a56b; --c-food:#f09a70; --c-act:#cf9de6; --c-trans:#7db4ff; --c-other:#a9b8c6; --c-ph:#55c9a9;}
 }
-.k-stay{--k:var(--c-stay)} .k-food{--k:var(--c-food)} .k-activity{--k:var(--c-act)} .k-transport{--k:var(--c-trans)} .k-other{--k:var(--c-other)}
+.k-stay{--k:var(--c-stay)} .k-food{--k:var(--c-food)} .k-activity{--k:var(--c-act)} .k-transport{--k:var(--c-trans)} .k-other{--k:var(--c-other)} .k-placeholder{--k:var(--c-ph)}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
@@ -112,7 +112,8 @@ svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke
 .agi .ico{color:var(--k)}
 .agi .tm{width:48px;font-variant-numeric:tabular-nums;color:var(--muted);flex:none}
 
-#bigmap,.mapbox{height:520px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--wk)}
+#bigmap{height:1040px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--wk)}
+.mapbox{height:520px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--wk)}
 .mapbox.sm{height:260px;border-radius:9px}
 .mapnote{font-size:12px;color:var(--muted);margin-top:4px}
 .leaflet-container{font:inherit}
@@ -200,6 +201,7 @@ dialog .toast{top:14px;bottom:auto}
 .tl-no{position:absolute;top:4px;width:12px;height:12px;border:2px solid;border-radius:3px;background:var(--surface);padding:0;cursor:pointer}
 .tl-lanes{position:relative}.tl-gap{position:absolute;top:0;bottom:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,rgba(224,160,0,.30) 0 6px,rgba(224,160,0,.12) 6px 12px);border-left:2px solid #d99a00;border-right:2px solid #d99a00;display:flex;align-items:center;justify-content:center}.tl-gap span{background:#fff3cf;color:#7a5200;font-size:11px;font-weight:700;padding:0 5px;border-radius:999px;white-space:nowrap}.tl-bar,.tl-no{z-index:2}.tl-lab u{font-size:11px;color:#a86b00;text-decoration:none;font-weight:700}.tl-emp{background:repeating-linear-gradient(135deg,rgba(224,160,0,.16) 0 6px,transparent 6px 12px)}
 .daygap{border:2px dashed #d99a00;background:repeating-linear-gradient(135deg,rgba(224,160,0,.18) 0 6px,rgba(224,160,0,.06) 6px 12px);color:#7a5200;font-size:13px;font-weight:700;text-align:center;padding:5px 8px;border-radius:8px;margin:2px 0}
+.card.k-placeholder{border-style:dashed;border-width:2px}.pin.k-placeholder{background:#fff;color:var(--c-ph);border:2px dashed var(--c-ph)}.tag.opt{background:var(--c-ph);color:#fff}.tl-note{margin:6px 0 0}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
 .fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
@@ -254,7 +256,8 @@ const TYPES=[
   {id:'food',label:'Meals & food',add:'Meal / food',icon:'food'},
   {id:'activity',label:'Activities',add:'Activity',icon:'star'},
   {id:'transport',label:'Transport',add:'Transport',icon:'train'},
-  {id:'other',label:'Other',add:'Other',icon:'tag'}
+  {id:'other',label:'Other',add:'Other',icon:'tag'},
+  {id:'placeholder',label:'Placeholder',add:'Placeholder (option)',icon:'pin'}
 ];
 const TYPE_BY_ID=Object.fromEntries(TYPES.map(t=>[t.id,t]));
 const MODES=[['train','Train'],['subway','Subway'],['flight','Flight'],['bus','Bus'],['car','Car / taxi'],['ferry','Ferry'],['walk','Walk'],['other','Other']];
@@ -1390,7 +1393,7 @@ async function drawRoute(map,a,b,mode,color,via,noFetch){
   try{line=L.polyline(pts,{color:color||'#2b6cb0',weight:4,opacity:.85,dashArray:dash}).addTo(map);}catch(e){line={bindPopup(){return line;}};} /* the map was closed or redrawn while the route was loading */
   return {line,note,diag,mode};
 }
-const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0',other:'#5b7083'};
+const TYPE_COLOR={stay:'#8a5a2b',food:'#c0562a',activity:'#8e44ad',transport:'#2b6cb0',other:'#5b7083',placeholder:'#1f8a70'};
 function pinIcon(type,label,tag){return L.divIcon({className:'',html:'<div class="pinw"><div class="pin k-'+type+'">'+esc(label||'')+'</div>'+(tag?'<span class="ptag k-'+type+'">'+esc(tag)+'</span>':'')+'</div>',iconSize:[22,22],iconAnchor:[11,11]});}
 let mapTags=true;try{mapTags=localStorage.getItem('travel-mgr-maptags-v1')!=='0';}catch(e){}
 const dayNo=d=>{const i=tripDays(trip()).indexOf(d);return i<0?'':'D'+(i+1);};
@@ -1433,6 +1436,7 @@ function cardHtml(it,date){
     else if(date===it.endDate){tag='<span class="tag">Check-out</span>';tm=it.endTime||'';}
     else tag='<span class="tag">Staying</span>';
   }else tm=it.time?(it.time+(it.endTime?'–'+it.endTime:'')):(it.slot||'');
+  if(it.type==='placeholder')tag='<span class="tag opt">Option</span>';
   let sub=[];
   if(it.type==='transport'){if(it.from||it.to)sub.push(esc(it.from)+' → '+esc(it.to));if(it.ref)sub.push(esc(it.ref));}
   else if(it.type==='food'){const ml=(MEALS.find(m=>m[0]===it.meal)||[])[1];if(ml&&it.meal)sub.push(esc(ml));if(it.place)sub.push(esc(it.place));}
@@ -1455,7 +1459,8 @@ function dayRows(date){
       else if(date===it.endDate)k=minOf(it.endTime||'10:00');
       else k=-1;
       rows.push({it,k});
-    }else if(it.date===date)rows.push({it,k:ord.get(it.id)||0});
+    }else if(it.type==='placeholder'){if(it.date===date)rows.push({it,k:200000+(it.time?minOf(it.time):0)});}
+    else if(it.date===date)rows.push({it,k:ord.get(it.id)||0});
   }
   return rows.sort((a,b)=>a.k-b.k||(a.it.title||'').localeCompare(b.it.title||''));
 }
@@ -1541,7 +1546,7 @@ function renderMapView(){
   drawBigMap();
 }
 let mapDayFilter='';
-let mapTypes={stay:true,food:true,activity:true,transport:true,other:true};
+let mapTypes={stay:true,food:true,activity:true,transport:true,other:true,placeholder:true};
 try{const s=JSON.parse(localStorage.getItem('travel-mgr-maptypes-v1')||'null');if(s&&typeof s==='object')for(const k of Object.keys(mapTypes))if(typeof s[k]==='boolean')mapTypes[k]=s[k];}catch(e){}
 async function drawBigMap(){
   const el=$('#bigmap');if(!el)return;
@@ -1561,7 +1566,7 @@ async function drawBigMap(){
         [[a,pinTag(it.date,it.time)],[b,'']].forEach(([p,tg])=>{L.marker([p.lat,p.lng],{icon:pinIcon('transport','',tg)}).addTo(m);bounds.push([p.lat,p.lng]);});n++;
       }else if(it.from||it.to)missing++;
     }else if(it.coord){
-      L.marker([it.coord.lat,it.coord.lng],{icon:pinIcon(it.type,'',pinTag(it.date,it.time))}).addTo(m).bindPopup('<b>'+esc(it.title)+'</b><br>'+esc(fmtShort(it.date))+(it.time?' '+esc(it.time):''));
+      L.marker([it.coord.lat,it.coord.lng],{icon:pinIcon(it.type,'',pinTag(it.date,it.time))}).addTo(m).bindPopup('<b>'+esc(it.title)+'</b><br>'+(it.type==='placeholder'?'Option for ':'')+esc(fmtShort(it.date))+(it.time?' '+esc(it.time):''));
       bounds.push([it.coord.lat,it.coord.lng]);n++;
     }else missing++;
   }
@@ -1619,15 +1624,16 @@ function renderItemDialog(first){
   if(edMap){edMap.remove();edMap=null;}
   const d=ed.draft,ty=TYPE_BY_ID[d.type],tr=d.type==='transport';
   const rail=tr&&(d.mode==='train'||d.mode==='subway');
-  const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',other:'Item / event',transport:'Service / description'}[d.type];
+  const titleLbl={stay:'Accommodation name',food:'Restaurant / meal',activity:'Activity',other:'Item / event',placeholder:'Place or idea',transport:'Service / description'}[d.type];
   let f=fld('Type','<select id="f_type">'+TYPES.map(x=>'<option value="'+x.id+'"'+(x.id===d.type?' selected':'')+'>'+x.label+'</option>').join('')+'</select>')+fld(titleLbl,inp('f_title',d.title));
   if(d.type==='stay')f+='<div class="grid2">'+fld('Check-in date',inp('f_date',d.date,'date'))+fld('Check-out date',inp('f_end',d.endDate,'date'))+fld('Check-in time',inp('f_time',d.time,'time'))+fld('Check-out time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Address',inp('f_addr',d.address,'text','Street address (helps the map)'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else if(d.type==='food')f+='<div class="grid4">'+fld('Date',inp('f_date',d.date,'date'))+fld('Meal','<select id="f_meal">'+MEALS.map(m=>'<option value="'+m[0]+'"'+(m[0]===d.meal?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place / venue',inp('f_place',d.place,'text','Name of the restaurant or area'))+'<div class="grid2">'+fld('Booking reference',inp('f_ref',d.ref))+fld('Menu / web link',inp('f_link',d.link,'url','https://'))+'</div>';
+  else if(d.type==='placeholder')f+='<div class="hint" style="margin:-2px 0 8px">Not part of the plan: an option for this day if plans change (wet weather, closures, a spare hour). It shows on the map as a dashed pin. Change the Type to Activity or Meal when you decide to go.</div><div class="grid2">'+fld('Day it could be done',inp('f_date',d.date,'date'))+fld('Roughly when (optional)',inp('f_time',d.time,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+fld('Web link',inp('f_link',d.link,'url','https://'));
   else if(d.type==='activity'||d.type==='other')f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Start time',inp('f_time',d.time,'time'))+fld('End time',inp('f_etime',d.endTime,'time'))+'</div>'+fld('Place',inp('f_place',d.place,'text','Where it is (helps the map)'))+'<div class="grid2">'+fld(d.type==='other'?'Reference':'Booking / ticket reference',inp('f_ref',d.ref))+fld('Web link',inp('f_link',d.link,'url','https://'))+'</div>';
   else f+='<div class="grid3">'+fld('Date',inp('f_date',d.date,'date'))+fld('Mode','<select id="f_mode">'+MODES.map(m=>'<option value="'+m[0]+'"'+(m[0]===(d.mode||'other')?' selected':'')+'>'+m[1]+'</option>').join('')+'</select>')+fld('Depart',inp('f_time',d.time,'time'))+'</div><div class="grid3">'+fld('From',inp('f_from',d.from,'text','e.g. Tokyo Station'))+fld('To',inp('f_to',d.to,'text','e.g. Shin-Osaka'))+fld('Arrive',inp('f_etime',d.endTime,'time'))+'</div><div class="grid2">'+fld(rail?'Service':'Service / booking reference',inp('f_ref',d.ref))+fld('Booking / web link',inp('f_link',d.link,'url','https://'))+'</div>';
   const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+(tr?'<label class="chk" style="margin-top:6px"><input type="checkbox" id="f_valid"'+(d.valid?' checked':'')+'> <b>✓ Validated</b> — route, times and booking checked</label>':'')+'</div>';
   const dlg=$('#dlg');
-  dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+ty.add.toLowerCase()+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+bkBlk+
+  dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+(d.type==='placeholder'?'placeholder':ty.add.toLowerCase())+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+(d.type==='placeholder'?'':bkBlk)+
     '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files or PDFs, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose PDFs / files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><button type="button" class="btn" data-act="clearmap" title="Remove the map link and the pin for this item">Remove link &amp; pin</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
@@ -2131,7 +2137,7 @@ const durTxt=m=>(m>=60?Math.floor(m/60)+'h':'')+(m%60?(m>=60?' ':'')+m%60+'m':''
 /* gaps = stretches between the first and last timed item of a day (5am-midnight) with nothing on in any lane, at least tlGap.min long; a day with no timed items at all is flagged too */
 function tlGaps(dayItems){
   const iv=[];
-  dayItems.forEach(it=>{const s=minOf(it.time);if(s==null)return;let e=minOf(it.endTime);if(e==null||e<=s)e=s+(TL_DUR[it.type]||60);iv.push([Math.max(s,TL_START),Math.min(e,TL_END)]);});
+  dayItems.forEach(it=>{if(it.type==='placeholder')return;const s=minOf(it.time);if(s==null)return;let e=minOf(it.endTime);if(e==null||e<=s)e=s+(TL_DUR[it.type]||60);iv.push([Math.max(s,TL_START),Math.min(e,TL_END)]);});
   if(!iv.length)return {empty:true,gaps:[]};
   iv.sort((a,b)=>a[0]-b[0]);
   const gaps=[];let cur=iv[0][1];
@@ -2178,7 +2184,7 @@ function pdfText(s){
   return String(s==null?'':s).replace(/[→⇒➜]/g,'->').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/[–—]/g,'-').replace(/…/g,'...').replace(/[✓✔✅]/g,'[ok]').replace(/[   ]/g,' ')
     .replace(/[\u{1F000}-\u{1FFFF}☀-➿️‍]/gu,'').replace(/[^\x09\x0A\x20-\x7E¡-ÿ]/g,'?').replace(/[ \t]+/g,' ').trim();
 }
-const PDF_RGB={stay:[138,90,43],food:[192,86,42],activity:[142,68,173],transport:[43,108,176],other:[91,112,131]};
+const PDF_RGB={stay:[138,90,43],food:[192,86,42],activity:[142,68,173],transport:[43,108,176],other:[91,112,131],placeholder:[31,138,112]};
 function pdfItemLines(it,date,o){
   const lines=[];
   const bits=[];
@@ -2233,7 +2239,7 @@ async function exportPdf(o){
       let tm='';
       if(it.type==='stay'){tm=d===it.date?(it.time||''):d===it.endDate?(it.endTime||''):'';}
       else tm=it.time?(it.time+(it.endTime?'-'+it.endTime:'')):(it.slot||'');
-      let tag='';if(it.type==='stay')tag=d===it.date?'Check-in':d===it.endDate?'Check-out':'Staying';
+      let tag='';if(it.type==='stay')tag=d===it.date?'Check-in':d===it.endDate?'Check-out':'Staying';else if(it.type==='placeholder')tag='Option';
       const title=pdfText(it.title+(tag?'  ['+tag+']':''));
       const lines=pdfItemLines(it,d,o);
       doc.setFontSize(10);const tl=doc.splitTextToSize(title,BODY);
