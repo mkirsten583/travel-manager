@@ -253,7 +253,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.1';
+const VERSION = '2026-11-22 · travel manager v3.2';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -2175,7 +2175,7 @@ function renderTimeline(){
 }
 /* ============ ALERTS: weather, earthquakes, official links and your own alerts ============ */
 const AL_KEY='travel-mgr-alerts-v1';
-let alData={trip:null,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},sig:''},alBusy=false;
+let alData={trip:null,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},sig:'',feeds:{gd:[],q:[],ts:[],jma:[]}},alBusy=false;
 try{const s=JSON.parse(localStorage.getItem(AL_KEY)||'null');if(s&&s.wx)alData=Object.assign(alData,s);}catch(e){}
 const alSave=()=>{try{localStorage.setItem(AL_KEY,JSON.stringify(alData));}catch(e){}};
 const WX_CODES={0:['Clear','☀️'],1:['Mostly clear','🌤️'],2:['Partly cloudy','⛅'],3:['Overcast','☁️'],45:['Fog','🌫️'],48:['Rime fog','🌫️'],51:['Light drizzle','🌦️'],53:['Drizzle','🌦️'],55:['Heavy drizzle','🌧️'],56:['Freezing drizzle','🌧️'],57:['Freezing drizzle','🌧️'],61:['Light rain','🌦️'],63:['Rain','🌧️'],65:['Heavy rain','🌧️'],66:['Freezing rain','🌧️'],67:['Freezing rain','🌧️'],71:['Light snow','🌨️'],73:['Snow','🌨️'],75:['Heavy snow','❄️'],77:['Snow grains','🌨️'],80:['Showers','🌦️'],81:['Showers','🌧️'],82:['Violent showers','⛈️'],85:['Snow showers','🌨️'],86:['Heavy snow showers','❄️'],95:['Thunderstorm','⛈️'],96:['Thunderstorm with hail','⛈️'],99:['Thunderstorm with heavy hail','⛈️']};
@@ -2206,7 +2206,7 @@ async function alRefresh(){
   const locs=alDayLocs(),days=Object.keys(locs);
   if(!days.length){toast('Nothing is pinned on the map yet. Use Find on map on a hotel first.');return;}
   alBusy=true;alUpdate();
-  const keep=alMine()?alData:{trip:selTrip,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{}};
+  const keep=alMine()?alData:{trip:selTrip,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},feeds:{gd:[],q:[],ts:[],jma:[]}};
   const groups={};
   days.forEach(d=>{const l=locs[d],k=l.lat.toFixed(1)+','+l.lng.toFixed(1);(groups[k]=groups[k]||{lat:l.lat,lng:l.lng,label:l.label,days:[]}).days.push(d);});
   const G=Object.values(groups);
@@ -2248,6 +2248,9 @@ async function alRefresh(){
     }).sort((a,b)=>b.time-a.time);
     keep.at.eq=Date.now();keep.err.eq=eqErr.length?'Partly loaded ('+eqErr.join('; ')+')':'';
   }else keep.err.eq=eqErr.join('; ')||'No earthquake data came back.';
+  const fz=await alFeeds(locs);
+  keep.feeds=Object.assign({},keep.feeds||{},Object.fromEntries(Object.keys(fz.feeds).filter(k=>({gd:'gd',q:'p2p',ts:'p2p',jma:'jma'}[k]) in fz.at).map(k=>[k,fz.feeds[k]])));
+  Object.assign(keep.at,fz.at);Object.keys(fz.err).forEach(k=>{keep.err[k]=fz.err[k];});
   keep.trip=selTrip;keep.loc=locs;keep.sig=alSig(locs);alData=keep;alBusy=false;alSave();alUpdate();
 }
 /* refresh when the pinned places changed, or the data is over 3 hours old; never more than once in 10 minutes for the same places */
@@ -2261,6 +2264,58 @@ function alMaybeRefresh(){
   if(alLast.sig===sig&&Date.now()-alLast.at<6e5)return;
   if(navigator.onLine===false)return;
   alLast={sig,at:Date.now()};alRefresh();
+}
+/* ---- live official feeds, tried straight from the browser (each reports its own result) ---- */
+const AL_PREFS=[['016000','Hokkaido',43.06,141.35],['020000','Aomori',40.82,140.74],['030000','Iwate',39.70,141.15],['040000','Miyagi',38.27,140.87],['050000','Akita',39.72,140.10],['060000','Yamagata',38.24,140.36],['070000','Fukushima',37.75,140.47],['080000','Ibaraki',36.34,140.45],['090000','Tochigi',36.57,139.88],['100000','Gunma',36.39,139.06],['110000','Saitama',35.86,139.65],['120000','Chiba',35.61,140.12],['130000','Tokyo',35.69,139.69],['140000','Kanagawa',35.45,139.64],['150000','Niigata',37.90,139.02],['160000','Toyama',36.70,137.21],['170000','Ishikawa',36.56,136.66],['180000','Fukui',36.07,136.22],['190000','Yamanashi',35.66,138.57],['200000','Nagano',36.65,138.18],['210000','Gifu',35.39,136.72],['220000','Shizuoka',34.98,138.38],['230000','Aichi',35.18,136.91],['240000','Mie',34.73,136.51],['250000','Shiga',35.00,135.87],['260000','Kyoto',35.02,135.76],['270000','Osaka',34.69,135.52],['280000','Hyogo',34.69,135.18],['290000','Nara',34.69,135.83],['300000','Wakayama',34.23,135.17],['310000','Tottori',35.50,134.24],['320000','Shimane',35.47,133.05],['330000','Okayama',34.66,133.93],['340000','Hiroshima',34.40,132.46],['350000','Yamaguchi',34.19,131.47],['360000','Tokushima',34.07,134.56],['370000','Kagawa',34.34,134.04],['380000','Ehime',33.84,132.77],['390000','Kochi',33.56,133.53],['400000','Fukuoka',33.61,130.42],['410000','Saga',33.25,130.30],['420000','Nagasaki',32.74,129.87],['430000','Kumamoto',32.79,130.74],['440000','Oita',33.24,131.61],['450000','Miyazaki',31.91,131.42],['460100','Kagoshima',31.56,130.56],['471000','Okinawa',26.21,127.68]];
+const alInJapan=l=>l&&l.lat>=24&&l.lat<=46&&l.lng>=122&&l.lng<=154;
+function alPref(l){let best=null,bd=1e9;AL_PREFS.forEach(p=>{const k=kmBetween(l,{lat:p[2],lng:p[3]});if(k<bd){bd=k;best=p;}});return best&&bd<=120?best:null;}
+const alErr=e=>e&&e.name==='AbortError'?'timed out':e&&/Failed to fetch|NetworkError|Load failed/i.test(e.message||'')?'could not be read from this page (offline, or the site does not allow web pages to read it)':(e&&e.message)||'failed';
+const p2pTime=s=>{const t=Date.parse(String(s||'').replace(/\//g,'-').replace(' ','T')+'+09:00');return isNaN(t)?0:t;};
+const P2P_SCALE={10:'1',20:'2',30:'3',40:'4',45:'5-',50:'5+',55:'6-',60:'6+',70:'7'};
+const GD_TYPE={EQ:'Earthquake',TC:'Tropical cyclone',VO:'Volcano',FL:'Flood'};
+async function alFeeds(locs){
+  const out={feeds:{gd:[],q:[],ts:[],jma:[]},at:{},err:{}},L=Object.values(locs),jp=L.some(alInJapan);
+  const tasks=[];
+  tasks.push(['gd',async()=>{
+    const from=toISO(new Date(Date.now()-10*864e5)),to=toISO(new Date(Date.now()+864e5));
+    const j=await alJson('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ;TC;VO;FL&fromdate='+from+'&todate='+to+'&alertlevel=orange;red');
+    out.feeds.gd=(j.features||[]).map(f=>{const p=f.properties||{},c=(f.geometry||{}).coordinates||[];return {id:'gd'+p.eventtype+p.eventid,type:p.eventtype,name:p.name||p.description||'',level:String(p.alertlevel||'').toLowerCase(),from:String(p.fromdate||'').slice(0,10),to:String(p.todate||'').slice(0,10),current:String(p.iscurrent)==='true',lat:c[1],lng:c[0],country:p.country||'',url:(p.url&&p.url.report)||'',sev:(p.severitydata&&p.severitydata.severitytext)||''};}).filter(g=>g.lat!=null);
+  }]);
+  if(jp){
+    tasks.push(['p2p',async()=>{
+      const j=await alJson('https://api.p2pquake.net/v2/history?codes=551&codes=552&limit=60');
+      (Array.isArray(j)?j:[]).forEach(r=>{
+        const t=p2pTime(r.time);
+        if(r.code===551&&r.earthquake){const e=r.earthquake,h=e.hypocenter||{};if(h.latitude>-100)out.feeds.q.push({id:'p2q'+(r.id||t),time:t,place:h.name||'',mag:h.magnitude>0?h.magnitude:null,lat:h.latitude,lng:h.longitude,scale:e.maxScale,tsunami:e.domesticTsunami});}
+        else if(r.code===552&&!r.cancelled&&(r.areas||[]).length)out.feeds.ts.push({id:'p2t'+(r.id||t),time:t,areas:r.areas});
+      });
+    }]);
+    const prefs={};L.filter(alInJapan).forEach(l=>{const p=alPref(l);if(p)prefs[p[0]]=p;});
+    tasks.push(['jma',async()=>{
+      const codes=Object.keys(prefs);if(!codes.length)throw new Error('no prefecture matched your pinned places');
+      let ok=0,last;
+      await Promise.all(codes.map(async c=>{try{const j=await alJson('https://www.jma.go.jp/bosai/warning/data/warning/'+c+'.json');ok++;const txt=String(j.headlineText||'').trim();if(txt)out.feeds.jma.push({id:'jma'+c,code:c,pref:prefs[c][1],text:txt,time:Date.parse(j.reportDatetime)||0});}catch(e){last=e;}}));
+      if(!ok)throw last||new Error('no data');
+    }]);
+  }
+  await Promise.all(tasks.map(async([k,fn])=>{try{await fn();out.at[k]=Date.now();out.err[k]='';}catch(e){out.err[k]=alErr(e);}}));
+  return out;
+}
+const tsLevel=a=>/Major|Warning/.test(a.grade||'')?'warn':'caution';
+function alLiveItems(locs){
+  /* everything the feeds say that is near any stop, regardless of day */
+  const L=Object.values(locs||{}),F=alData.feeds||{},now=Date.now(),out=[];
+  const near=(la,lo,r)=>la!=null&&L.some(l=>kmBetween(l,{lat:la,lng:lo})<=r);
+  (F.gd||[]).forEach(g=>{if(near(g.lat,g.lng,g.type==='TC'?600:300))out.push({key:g.id,level:g.level==='red'?'warn':'caution',src:'GDACS',text:(GD_TYPE[g.type]||g.type)+': '+g.name+(g.sev?' ('+g.sev+')':''),url:g.url,from:g.from,to:g.to||g.from});});
+  (F.q||[]).forEach(q=>{if(now-q.time>3*864e5)return;if(!near(q.lat,q.lng,300))return;const big=q.scale>=40||(q.mag&&q.mag>=5);if(!big)return;out.push({key:q.id,level:q.scale>=55?'warn':q.scale>=45||(q.mag&&q.mag>=6)?'caution':'info',src:'P2P Quake / JMA',text:'Earthquake '+agoTxt(q.time)+(q.mag?' M'+q.mag.toFixed(1):'')+', '+q.place+(q.scale>0?', max intensity '+P2P_SCALE[q.scale]+' (shindo)':'')+(q.tsunami&&/Watch|Warning/.test(q.tsunami)?', tsunami: '+q.tsunami:''),live:true});});
+  (F.ts||[]).forEach(t=>{if(now-t.time>24*36e5)return;const worst=t.areas.some(a=>/Major|^Warning/.test(a.grade||''))?'warn':'caution';out.push({key:t.id,level:worst,src:'P2P Quake / JMA',text:'Tsunami forecast issued '+agoTxt(t.time)+': '+t.areas.slice(0,3).map(a=>(a.name||'')+' ('+(a.grade||'')+')').join(', ')+(t.areas.length>3?' and '+(t.areas.length-3)+' more areas':''),live:true,url:'https://www.jma.go.jp/bosai/map.html#contents=tsunami&lang=en'});});
+  (F.jma||[]).forEach(w=>{const pr=AL_PREFS.find(p=>p[0]===w.code);if(!pr||!L.some(l=>kmBetween(l,{lat:pr[2],lng:pr[3]})<=120))return;out.push({key:w.id,level:/特別警報/.test(w.text)?'warn':/警報/.test(w.text)?'caution':'info',src:'JMA '+w.pref,text:w.pref+': '+w.text,live:true,url:'https://www.jma.go.jp/bosai/warning/#lang=en'});});
+  return out.sort((a,b)=>AL_LV[a.level][1]-AL_LV[b.level][1]);
+}
+function alLiveFor(d){
+  const l=alData.loc[d];if(!l)return [];
+  const today=toISO(new Date()),soon=d>=addDays(today,-1)&&d<=addDays(today,3);
+  return alLiveItems({[d]:l}).filter(a=>a.live?soon:(d>=addDays(a.from,-1)&&d<=addDays(a.to,1))).map(a=>({level:a.level,src:a.src,qid:a.key,text:a.text,url:a.url}));
 }
 function wxFlags(w){
   const f=[];if(!w||w.kind!=='forecast')return f;
@@ -2284,6 +2339,7 @@ function alAlertsFor(d){
     const l=alData.loc[d];
     (alData.eq||[]).filter(q=>q.mag>=5&&Date.now()-q.time<7*864e5&&l&&kmBetween(l,{lat:q.lat,lng:q.lng})<=150).forEach(q=>out.push({level:eqLevel(q),src:'Earthquake',qid:q.id,text:'M'+q.mag.toFixed(1)+' earthquake '+agoTxt(q.time)+', '+q.place+(q.tsunami?' (tsunami flag set)':''),url:q.url}));
   }
+  if(alMine())alLiveFor(d).forEach(a=>out.push(a));
   const t=trip();((t&&t.days[d]&&t.days[d].alerts)||[]).forEach(a=>out.push({level:a.level||'info',src:'Yours',text:a.text,url:a.link,manual:true,id:a.id,date:d}));
   return out.sort((a,b)=>AL_LV[a.level][1]-AL_LV[b.level][1]);
 }
@@ -2334,12 +2390,16 @@ function renderAlerts(){
   const t=trip(),days=tripDays(t);
   const stat=(k,lab)=>{const at=alData.at[k],er=alData.err[k];return '<span class="alstat '+(at&&!er?'ok':at?'part':'bad')+'"><b>'+lab+'</b> '+(alBusy?'checking…':at?'updated '+agoTxt(at)+(er?' · '+esc(er):''):esc(er||'not loaded yet'))+'</span>';};
   let h='<div class="alview"><div class="alhd"><h2 style="margin:0">Alerts and conditions</h2><span class="sp"></span><button class="btn" data-act="alertadd" data-date="'+esc(selDate||days[0]||'')+'">+ Add alert</button><button class="btn primary" data-act="alertrefresh" '+(alBusy?'disabled':'')+'>'+(alBusy?'Checking…':'Refresh now')+'</button></div>'+
-    '<div class="alstats">'+stat('wx','Weather')+stat('eq','Earthquakes')+'</div>';
+    '<div class="alstats">'+stat('wx','Weather')+stat('eq','Earthquakes')+stat('gd','Disaster alerts (GDACS)')+(Object.values(alData.loc||{}).some(alInJapan)?stat('p2p','Japan quakes and tsunami (P2P Quake)')+stat('jma','JMA warnings'):'')+'</div>';
   /* needs attention */
   const all=[],seenQ=new Set();days.forEach((d,ix)=>alAlertsFor(d).forEach(a=>{if(a.qid){if(seenQ.has(a.qid))return;seenQ.add(a.qid);}all.push(Object.assign({d,ix},a));}));
   h+='<h3>Needs attention</h3>';
   const important=all.filter(a=>a.level!=='info'||a.manual);
   h+=important.length?important.map(a=>'<div class="alday"><button class="linkbtn" data-act="godate" data-date="'+esc(a.d)+'">Day '+(a.ix+1)+' · '+esc(fmtShort(a.d))+'</button>'+alRowHtml(a)+'</div>').join(''):'<div class="alnone">Nothing flagged for any day of this trip'+(alMine()&&alData.at.wx?'.':' yet; weather and earthquake checks have not loaded.')+'</div>';
+  /* live official feeds */
+  const live=alMine()?alLiveItems(alData.loc):[];
+  h+='<h3>Live official warnings near your route</h3><div class="hint" style="margin-bottom:6px">Read straight from GDACS (UN/EU disaster alerts: typhoons, big quakes, volcanoes, floods) and, in Japan, from P2P Quake (JMA earthquake and tsunami information) and JMA prefecture warnings. If a source shows a red status above, your browser was not allowed to read it, so use the links at the bottom.</div>';
+  h+=live.length?live.map(a=>alRowHtml(a)).join(''):'<div class="alnone">'+((alData.at.gd||alData.at.p2p||alData.at.jma)?'No active warnings found near your route.':'Not loaded yet.')+'</div>';
   /* weather table */
   h+='<h3>Weather by day</h3><div class="tl-wrap"><table class="altable"><thead><tr><th>Day</th><th>Near</th><th>Conditions</th><th>High / low</th><th>Rain</th><th>Gusts</th><th>Basis</th></tr></thead><tbody>'+days.map((d,ix)=>{
     const w=alMine()?alData.wx[d]:null,l=alMine()?alData.loc[d]:null;
