@@ -206,6 +206,7 @@ dialog .toast{top:14px;bottom:auto}
 .al{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:8px;margin:3px 0;border-left:4px solid var(--line);background:var(--wk);font-size:13.5px}.al .altx{flex:1}.al .alsrc{font-size:11px;color:var(--muted);white-space:nowrap}.al .allv{font-size:11px;font-weight:800;text-transform:uppercase;white-space:nowrap;padding:1px 6px;border-radius:999px;color:#fff}
 .al.warn{border-left-color:#c62828;background:rgba(198,40,40,.10)}.al.warn .allv{background:#c62828}.al.caution{border-left-color:#d99a00;background:rgba(217,154,0,.13)}.al.caution .allv{background:#b57f00}.al.info{border-left-color:#5b7083}.al.info .allv{background:#5b7083}
 .alnone{font-size:13px;color:var(--muted);padding:4px 2px}.alopt{font-size:13px;padding:2px 8px 4px}.albadge{background:#c62828;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;margin-left:3px}
+.actq{display:flex;gap:8px;margin:8px 0}.actq input{flex:1}.actrow{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--wk);margin:6px 0}.actrow.done .acttx{text-decoration:line-through;opacity:.6}.acttick{flex:none;width:22px;height:22px;border-radius:6px;border:2px solid var(--line);background:transparent;cursor:pointer;font-weight:700;color:#2e7d32;padding:0;line-height:1}.actrow.done .acttick{border-color:#2e7d32}.actmain{flex:1;cursor:pointer;min-width:0}.acttx{font-weight:600;overflow-wrap:anywhere}.actmeta{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}.actchip{font-size:11.5px;padding:1px 8px;border-radius:999px;background:color-mix(in srgb,var(--line) 50%,transparent)}.actchip.over{background:#c6282822;color:#c62828}.actchip.today{background:#d99a0033}.actnote{font-size:12.5px;color:var(--mut,#666);margin-top:3px;white-space:pre-wrap}
 .alview h3{margin:18px 0 6px;font-size:15px}.alstats{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.alstat{font-size:12.5px;border-radius:999px;padding:3px 10px;background:var(--wk);border:1px solid var(--line)}.alstat.ok{border-color:#2e7d32}.alstat.part{border-color:#d99a00}.alstat.bad{border-color:#c62828}
 .alday{margin:6px 0}.alday .linkbtn{font-weight:700;margin-bottom:2px}.altable{border-collapse:collapse;width:100%;font-size:13px}.altable th,.altable td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.altable th{background:var(--wk);font-size:12px}.altable tr.warn td{background:rgba(198,40,40,.10)}.altable tr.caution td{background:rgba(217,154,0,.12)}
 .allinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}.allink{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);text-decoration:none}.allink:hover{background:var(--wk)}.allink span{font-size:12px;color:var(--muted)}
@@ -224,7 +225,7 @@ dialog .toast{top:14px;bottom:auto}
     <h1>Travel manager</h1>
     <select id="tripSel" aria-label="Trip"></select>
     <div class="seg" id="viewSeg">
-      <button data-view="day">Day</button><button data-view="timeline">Timeline</button><button data-view="map">Map</button><button data-view="alerts">Alerts</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
+      <button data-view="day">Day</button><button data-view="timeline">Timeline</button><button data-view="map">Map</button><button data-view="alerts">Alerts</button><button data-view="actions">Actions</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
     </div>
     <span class="sp"></span>
     <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
@@ -253,7 +254,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.5';
+const VERSION = '2026-11-22 · travel manager v3.6';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -330,7 +331,7 @@ function normalise(o){
   o=(o&&typeof o==='object')?o:{};
   const d={v:1,trips:Array.isArray(o.trips)?o.trips:[],items:Array.isArray(o.items)?o.items:[],notes:Array.isArray(o.notes)?o.notes:[],geo:(o.geo&&typeof o.geo==='object')?o.geo:{}};
   for(const k of Object.keys(d.geo))if(!d.geo[k])delete d.geo[k];
-  for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];}
+  for(const t of d.trips){t.id=t.id||uid();t.name=t.name||'Trip';t.days=t.days||{};t.region=t.region||'';t.sources=Array.isArray(t.sources)?t.sources:[];t.actions=Array.isArray(t.actions)?t.actions:[];}
   for(const n of d.notes){n.id=n.id||uid();n.title=n.title||'';n.body=n.body||'';n.atts=Array.isArray(n.atts)?n.atts:[];}
   for(const it of d.items){if(it.via!=null)it.via=(Array.isArray(it.via)?it.via:[]).filter(v=>!v||(isFinite(v.lat)&&isFinite(v.lng)));}
   for(const it of d.items){it.id=it.id||uid();it.atts=Array.isArray(it.atts)?it.atts:[];it.notes=it.notes||'';for(const f of ['bk','ref','price','how','svc','bkNote'])it[f]=it[f]||'';}
@@ -1605,10 +1606,10 @@ function renderAll(){
   else{
     renderRail();
     if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
-    ({day:renderDay,timeline:renderTimeline,map:renderMapView,alerts:renderAlerts,reports:renderReports}[view]||renderDay)();
-    $('.layout').classList.toggle('rep',view==='reports'||view==='timeline'||view==='alerts');
+    ({day:renderDay,timeline:renderTimeline,map:renderMapView,alerts:renderAlerts,actions:renderActions,reports:renderReports}[view]||renderDay)();
+    $('.layout').classList.toggle('rep',view==='reports'||view==='timeline'||view==='alerts'||view==='actions');
   }
-  alBadge();
+  alBadge();actBadge();
   $('#foot').textContent='Version '+VERSION;
 }
 function ensureSel(){
@@ -2494,6 +2495,70 @@ function delAlert(d,id){
   const t=trip(),day=t&&t.days[d];if(!day||!day.alerts)return;
   day.alerts=day.alerts.filter(a=>a.id!==id);changed();renderAll();
 }
+/* ============ ACTIONS (things to organise) ============ */
+/* trip.actions=[{id,text,due,day,pri,done,doneAt,notes,created}] ; synced with the data file like everything else on the trip */
+let actFilter='open';try{actFilter=localStorage.getItem('travel-mgr-actfilter-v1')||'open';}catch(e){}
+const ACT_PRI={high:['High',0],normal:['Normal',1],low:['Low',2]};
+const actDueState=a=>{if(a.done||!a.due)return '';const td=toISO(new Date());return a.due<td?'over':a.due===td?'today':'';};
+function actBadge(){
+  const b=$('#viewSeg button[data-view=actions]');if(!b||!trip())return;
+  const n=(trip().actions||[]).filter(a=>!a.done).length;
+  b.innerHTML='Actions'+(n?' <span class="albadge">'+n+'</span>':'');
+}
+function renderActions(){
+  const t=trip(),days=tripDays(t),all=t.actions||[];
+  const open=all.filter(a=>!a.done),done=all.filter(a=>a.done);
+  let list=actFilter==='open'?open:actFilter==='done'?done:all.slice();
+  list.sort((a,b)=>(a.done-b.done)||((a.due||'9999')<(b.due||'9999')?-1:(a.due||'9999')>(b.due||'9999')?1:0)||(ACT_PRI[a.pri||'normal'][1]-ACT_PRI[b.pri||'normal'][1])||(a.created-b.created));
+  const flt=(k,l,n)=>'<button class="btn sm'+(actFilter===k?' primary':'')+'" data-act="actfilter" data-k="'+k+'">'+l+' ('+n+')</button>';
+  let h='<div class="alview"><div class="alhd"><h2 style="margin:0">Actions</h2><span class="sp"></span><button class="btn primary" data-act="actadd">+ Add action</button></div>'+
+    '<div class="hint" style="margin:6px 0">Things to organise for this trip: bookings, tickets, passes, packing, calls. Tick one off when it is done.</div>'+
+    '<div class="actq"><input id="act_q" type="text" placeholder="Quick add: type an action and press Enter"><button class="btn" data-act="actquick">Add</button></div>'+
+    '<div class="alstats">'+flt('open','Open',open.length)+flt('done','Done',done.length)+flt('all','All',all.length)+'</div>';
+  h+=list.length?list.map(a=>{
+    const ds=actDueState(a),dayIx=a.day?days.indexOf(a.day):-1;
+    return '<div class="actrow'+(a.done?' done':'')+'"><button class="acttick" data-act="acttoggle" data-id="'+esc(a.id)+'" aria-label="'+(a.done?'Mark open':'Mark done')+'">'+(a.done?'✓':'')+'</button>'+
+      '<div class="actmain" data-act="actedit" data-id="'+esc(a.id)+'"><div class="acttx">'+esc(a.text)+'</div>'+
+      '<div class="actmeta">'+(a.due?'<span class="actchip '+ds+'">'+(ds==='over'?'Overdue · ':ds==='today'?'Due today · ':'Due ')+esc(fmtShort(a.due))+'</span>':'')+
+      (dayIx>=0?'<span class="actchip">For day '+(dayIx+1)+' · '+esc(fmtShort(a.day))+'</span>':'')+
+      (a.pri==='high'?'<span class="actchip over">High priority</span>':a.pri==='low'?'<span class="actchip">Low</span>':'')+
+      (a.done&&a.doneAt?'<span class="actchip">Done '+esc(fmtShort(toISO(new Date(a.doneAt))))+'</span>':'')+'</div>'+
+      (a.notes?'<div class="actnote">'+esc(a.notes)+'</div>':'')+'</div>'+
+      '<button class="x" data-act="actdel" data-id="'+esc(a.id)+'" aria-label="Delete action" title="Delete">&times;</button></div>';
+  }).join(''):'<div class="alnone">'+(all.length?'Nothing here. Switch the filter above.':'No actions yet. Add the first one above.')+'</div>';
+  h+='</div>';
+  $('#main').innerHTML=h;
+  const q=$('#act_q');if(q)q.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();actQuick();}});
+}
+function actQuick(){
+  const q=$('#act_q'),text=q?q.value.trim():'';if(!text)return;
+  const t=trip();t.actions=t.actions||[];t.actions.push({id:uid(),text,due:'',day:'',pri:'normal',done:false,notes:'',created:Date.now()});
+  changed();renderAll();const n=$('#act_q');if(n)n.focus();
+}
+function openActionDialog(id){
+  const t=trip();if(!t)return;
+  const a=(t.actions||[]).find(x=>x.id===id)||{text:'',due:'',day:'',pri:'normal',notes:''},days=tripDays(t),dlg=$('#dlg');
+  dlg.innerHTML='<div class="dbody"><div class="dh"><span>'+(id?'Edit action':'Add action')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    '<label class="f"><span>What needs organising</span><textarea id="x_text" rows="2" placeholder="e.g. Book Shinkansen Kanazawa to Nagano, buy Suica cards, check passport expiry">'+esc(a.text)+'</textarea></label>'+
+    '<label class="f"><span>Do by (optional)</span><input id="x_due" type="date" value="'+esc(a.due||'')+'"></label>'+
+    '<label class="f"><span>Relates to day (optional)</span><select id="x_day"><option value="">Not tied to a day</option>'+days.map((d,i)=>'<option value="'+esc(d)+'"'+(d===a.day?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select></label>'+
+    '<label class="f"><span>Priority</span><select id="x_pri">'+Object.keys(ACT_PRI).map(k=>'<option value="'+k+'"'+((a.pri||'normal')===k?' selected':'')+'>'+ACT_PRI[k][0]+'</option>').join('')+'</select></label>'+
+    '<label class="f"><span>Notes (optional)</span><textarea id="x_notes" rows="3">'+esc(a.notes||'')+'</textarea></label>'+
+    '</div><div class="df">'+(id?'<button class="btn" data-act="actdel" data-id="'+esc(id)+'" style="margin-right:auto">Delete</button>':'')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="actsave" data-id="'+esc(id||'')+'">Save</button></div></div>';
+  dlg.onclose=null;if(!dlg.open)dlg.showModal();
+  setTimeout(()=>{const e=$('#x_text');if(e)e.focus();},50);
+}
+function saveAction(id){
+  const t=trip(),text=$('#x_text').value.trim();
+  if(!text){toast('Please say what needs organising.');return;}
+  t.actions=t.actions||[];
+  const f={text,due:$('#x_due').value||'',day:$('#x_day').value||'',pri:$('#x_pri').value,notes:$('#x_notes').value.trim()};
+  const a=id&&t.actions.find(x=>x.id===id);
+  if(a)Object.assign(a,f);else t.actions.push(Object.assign({id:uid(),done:false,created:Date.now()},f));
+  $('#dlg').close();changed();renderAll();
+}
+function toggleAction(id){const a=((trip()||{}).actions||[]).find(x=>x.id===id);if(!a)return;a.done=!a.done;a.doneAt=a.done?Date.now():0;changed();renderAll();}
+function delAction(id){const t=trip();if(!t)return;t.actions=(t.actions||[]).filter(x=>x.id!==id);if($('#dlg').open)$('#dlg').close();changed();renderAll();}
 /* ============ EXPORT ITINERARY TO PDF ============ */
 const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 let jspdfReady=null;
@@ -2651,6 +2716,13 @@ function onAct(el,e){
     case 'data':openData();break;
     case 'print':window.print();break;
     case 'exportpdf':openExportPdf();break;
+    case 'actadd':openActionDialog('');break;
+    case 'actedit':openActionDialog(el.dataset.id);break;
+    case 'actsave':saveAction(el.dataset.id);break;
+    case 'actdel':delAction(el.dataset.id);break;
+    case 'acttoggle':toggleAction(el.dataset.id);break;
+    case 'actquick':actQuick();break;
+    case 'actfilter':actFilter=el.dataset.k;try{localStorage.setItem('travel-mgr-actfilter-v1',actFilter);}catch(x){}renderActions();break;
     case 'alertadd':openAlertDialog(el.dataset.date||selDate);break;
     case 'alertsave':saveAlert();break;
     case 'alertdel':delAlert(el.dataset.date,el.dataset.id);break;
@@ -2796,7 +2868,7 @@ window.__travel={geoCands,geoFind,geoClean,openNote,renderNotes,srcById,attBlob,
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
   try{selTrip=localStorage.getItem(LS_SEL);view=localStorage.getItem(LS_VIEW)||'day';}catch(e){}
-  if(!['day','timeline','map','alerts','reports','notes'].includes(view))view='day';
+  if(!['day','timeline','map','alerts','actions','reports','notes'].includes(view))view='day';
   renderAll();setStatus('local');
   if(msalConfigured()&&window.msal){
     try{
