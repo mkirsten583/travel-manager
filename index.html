@@ -202,6 +202,13 @@ dialog .toast{top:14px;bottom:auto}
 .tl-lanes{position:relative}.tl-gap{position:absolute;top:0;bottom:0;z-index:1;pointer-events:none;background:repeating-linear-gradient(135deg,rgba(224,160,0,.30) 0 6px,rgba(224,160,0,.12) 6px 12px);border-left:2px solid #d99a00;border-right:2px solid #d99a00;display:flex;align-items:center;justify-content:center}.tl-gap span{background:#fff3cf;color:#7a5200;font-size:11px;font-weight:700;padding:0 5px;border-radius:999px;white-space:nowrap}.tl-bar,.tl-no{z-index:2}.tl-lab u{font-size:11px;color:#a86b00;text-decoration:none;font-weight:700}.tl-emp{background:repeating-linear-gradient(135deg,rgba(224,160,0,.16) 0 6px,transparent 6px 12px)}
 .daygap{border:2px dashed #d99a00;background:repeating-linear-gradient(135deg,rgba(224,160,0,.18) 0 6px,rgba(224,160,0,.06) 6px 12px);color:#7a5200;font-size:13px;font-weight:700;text-align:center;padding:5px 8px;border-radius:8px;margin:2px 0}
 .card.k-placeholder{border-style:dashed;border-width:2px}.pin.k-placeholder{background:#fff;color:var(--c-ph);border:2px dashed var(--c-ph)}.tag.opt{background:var(--c-ph);color:#fff}.tl-note{margin:6px 0 0}
+.alertbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:12px}.alhd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px}.alhd .sp{flex:1}.alwx{font-size:13px;background:var(--wk);border-radius:999px;padding:2px 10px}.alwx i{color:var(--muted)}
+.al{display:flex;align-items:flex-start;gap:8px;padding:5px 8px;border-radius:8px;margin:3px 0;border-left:4px solid var(--line);background:var(--wk);font-size:13.5px}.al .altx{flex:1}.al .alsrc{font-size:11px;color:var(--muted);white-space:nowrap}.al .allv{font-size:11px;font-weight:800;text-transform:uppercase;white-space:nowrap;padding:1px 6px;border-radius:999px;color:#fff}
+.al.warn{border-left-color:#c62828;background:rgba(198,40,40,.10)}.al.warn .allv{background:#c62828}.al.caution{border-left-color:#d99a00;background:rgba(217,154,0,.13)}.al.caution .allv{background:#b57f00}.al.info{border-left-color:#5b7083}.al.info .allv{background:#5b7083}
+.alnone{font-size:13px;color:var(--muted);padding:4px 2px}.alopt{font-size:13px;padding:2px 8px 4px}.albadge{background:#c62828;color:#fff;border-radius:999px;font-size:11px;padding:0 6px;margin-left:3px}
+.alview h3{margin:18px 0 6px;font-size:15px}.alstats{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.alstat{font-size:12.5px;border-radius:999px;padding:3px 10px;background:var(--wk);border:1px solid var(--line)}.alstat.ok{border-color:#2e7d32}.alstat.part{border-color:#d99a00}.alstat.bad{border-color:#c62828}
+.alday{margin:6px 0}.alday .linkbtn{font-weight:700;margin-bottom:2px}.altable{border-collapse:collapse;width:100%;font-size:13px}.altable th,.altable td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.altable th{background:var(--wk);font-size:12px}.altable tr.warn td{background:rgba(198,40,40,.10)}.altable tr.caution td{background:rgba(217,154,0,.12)}
+.allinks{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px}.allink{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);text-decoration:none}.allink:hover{background:var(--wk)}.allink span{font-size:12px;color:var(--muted)}
 @media print{.rep-wrap{overflow:visible;border:0}.rep-t{font-size:10px}.rep-t td,.rep-t th{padding:3px 5px}.rep-t tr{break-inside:avoid}.layout.rep{display:block}}
 .srcrow{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}.srcrow:first-of-type{border-top:0}.srcbtn{display:flex;gap:5px;flex-wrap:wrap}
 .fchip.kall.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}.fchip .n{opacity:.75;font-weight:700}
@@ -217,7 +224,7 @@ dialog .toast{top:14px;bottom:auto}
     <h1>Travel manager</h1>
     <select id="tripSel" aria-label="Trip"></select>
     <div class="seg" id="viewSeg">
-      <button data-view="day">Day</button><button data-view="timeline">Timeline</button><button data-view="map">Map</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
+      <button data-view="day">Day</button><button data-view="timeline">Timeline</button><button data-view="map">Map</button><button data-view="alerts">Alerts</button><button data-view="reports">Reports</button><button data-view="notes">Notes</button>
     </div>
     <span class="sp"></span>
     <button class="btn" data-act="import"><svg class="i" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Import itinerary</button>
@@ -246,7 +253,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.0';
+const VERSION = '2026-11-22 · travel manager v3.1';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -1473,7 +1480,7 @@ function renderDay(){
   const i=days.indexOf(selDate),dd=t.days[selDate]||{};
   let h='<div class="dayhead"><div class="row1"><button class="btn sm nop" data-act="prevday" '+(i<=0?'disabled':'')+'>‹</button><h2>Day '+(i+1)+' · '+esc(fmtLong(selDate))+'</h2><button class="btn sm nop" data-act="nextday" '+(i>=days.length-1?'disabled':'')+'>›</button></div>'+
     '<input class="dtitle" id="dayTitle" placeholder="Where / theme for the day (e.g. Tokyo – Asakusa & Ueno)" value="'+esc(dd.title||'')+'">'+
-    '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>';
+    '<textarea class="daynotes" id="dayNotes" placeholder="Notes for the whole day">'+esc(dd.notes||'')+'</textarea></div>'+alertBoxHtml(selDate);
   /* one chronological list for the day; stays slot in at check-out (morning) / check-in (afternoon), or sit at the top while staying */
   const rows=dayRows(selDate);
   const cnt={};rows.forEach(r=>cnt[r.it.type]=(cnt[r.it.type]||0)+1);
@@ -1598,9 +1605,10 @@ function renderAll(){
   else{
     renderRail();
     if(bigMap&&view!=='map'){bigMap.remove();bigMap=null;}
-    ({day:renderDay,timeline:renderTimeline,map:renderMapView,reports:renderReports}[view]||renderDay)();
-    $('.layout').classList.toggle('rep',view==='reports'||view==='timeline');
+    ({day:renderDay,timeline:renderTimeline,map:renderMapView,alerts:renderAlerts,reports:renderReports}[view]||renderDay)();
+    $('.layout').classList.toggle('rep',view==='reports'||view==='timeline'||view==='alerts');
   }
+  alBadge();
   $('#foot').textContent='Version '+VERSION;
 }
 function ensureSel(){
@@ -2165,6 +2173,213 @@ function renderTimeline(){
   }).join('');
   $('#main').innerHTML='<h2 class="tl-title">'+esc(t.name)+' — timeline</h2>'+legend+'<div class="tl-wrap"><div class="tl">'+head+body+'</div></div>';
 }
+/* ============ ALERTS: weather, earthquakes, official links and your own alerts ============ */
+const AL_KEY='travel-mgr-alerts-v1';
+let alData={trip:null,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},sig:''},alBusy=false;
+try{const s=JSON.parse(localStorage.getItem(AL_KEY)||'null');if(s&&s.wx)alData=Object.assign(alData,s);}catch(e){}
+const alSave=()=>{try{localStorage.setItem(AL_KEY,JSON.stringify(alData));}catch(e){}};
+const WX_CODES={0:['Clear','☀️'],1:['Mostly clear','🌤️'],2:['Partly cloudy','⛅'],3:['Overcast','☁️'],45:['Fog','🌫️'],48:['Rime fog','🌫️'],51:['Light drizzle','🌦️'],53:['Drizzle','🌦️'],55:['Heavy drizzle','🌧️'],56:['Freezing drizzle','🌧️'],57:['Freezing drizzle','🌧️'],61:['Light rain','🌦️'],63:['Rain','🌧️'],65:['Heavy rain','🌧️'],66:['Freezing rain','🌧️'],67:['Freezing rain','🌧️'],71:['Light snow','🌨️'],73:['Snow','🌨️'],75:['Heavy snow','❄️'],77:['Snow grains','🌨️'],80:['Showers','🌦️'],81:['Showers','🌧️'],82:['Violent showers','⛈️'],85:['Snow showers','🌨️'],86:['Heavy snow showers','❄️'],95:['Thunderstorm','⛈️'],96:['Thunderstorm with hail','⛈️'],99:['Thunderstorm with heavy hail','⛈️']};
+const wxInfo=c=>WX_CODES[c]||['Unknown','·'];
+const AL_LV={warn:['Warning',0],caution:['Caution',1],info:['Info',2]};
+const alMine=()=>alData.trip===selTrip;
+/* where the traveller is each day: that night's hotel, else any pinned place that day, else the day before */
+function alDayLocs(){
+  const t=trip(),days=tripDays(t),its=tripItems(),out={};
+  const stays=its.filter(i=>i.type==='stay'&&i.coord&&i.date);
+  let last=null;
+  days.forEach(d=>{
+    const s=stays.find(x=>x.date<=d&&d<(x.endDate||addDays(x.date,1)))||stays.find(x=>(x.endDate||addDays(x.date,1))===d);
+    let c=s?{lat:s.coord.lat,lng:s.coord.lng,label:s.title}:null;
+    if(!c){const o=its.find(i=>i.date===d&&i.type!=='transport'&&i.type!=='stay'&&i.coord);if(o)c={lat:o.coord.lat,lng:o.coord.lng,label:o.title};}
+    if(!c){const o=its.find(i=>i.date===d&&i.type==='transport'&&(i.toCoord||i.fromCoord));if(o){const p=o.toCoord||o.fromCoord;c={lat:p.lat,lng:p.lng,label:o.title};}}
+    if(!c&&last)c=last;else if(c)last=c;
+    if(c)out[d]=c;
+  });
+  const first=days.find(d=>out[d]);if(first)days.forEach(d=>{if(!out[d])out[d]=out[first];});
+  return out;
+}
+const alJson=async(url)=>{const c=new AbortController(),to=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}finally{clearTimeout(to);}};
+const alPrevYear=d=>(+d.slice(0,4)-1)+d.slice(4);
+const alRound=n=>n==null?null:Math.round(n*10)/10;
+async function alRefresh(){
+  if(alBusy||!trip())return;
+  const locs=alDayLocs(),days=Object.keys(locs);
+  if(!days.length){toast('Nothing is pinned on the map yet. Use Find on map on a hotel first.');return;}
+  alBusy=true;alUpdate();
+  const keep=alMine()?alData:{trip:selTrip,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{}};
+  const groups={};
+  days.forEach(d=>{const l=locs[d],k=l.lat.toFixed(1)+','+l.lng.toFixed(1);(groups[k]=groups[k]||{lat:l.lat,lng:l.lng,label:l.label,days:[]}).days.push(d);});
+  const G=Object.values(groups);
+  /* weather */
+  let wx={},wxErr=[];
+  await Promise.all(G.map(async g=>{
+    const got={};
+    try{
+      const j=await alJson('https://api.open-meteo.com/v1/forecast?latitude='+g.lat+'&longitude='+g.lng+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_gusts_10m_max,snowfall_sum&timezone=auto&forecast_days=16');
+      const D=j.daily||{};(D.time||[]).forEach((d,i)=>{if(g.days.includes(d))got[d]={code:D.weather_code[i],hi:alRound(D.temperature_2m_max[i]),lo:alRound(D.temperature_2m_min[i]),rain:alRound(D.precipitation_sum[i]),pop:D.precipitation_probability_max?D.precipitation_probability_max[i]:null,gust:alRound(D.wind_gusts_10m_max[i]),snow:alRound(D.snowfall_sum[i]),kind:'forecast'};});
+    }catch(e){wxErr.push('forecast: '+(e.name==='AbortError'?'timed out':e.message));}
+    const rest=g.days.filter(d=>!got[d]);
+    if(rest.length){
+      try{
+        const sh=rest.map(alPrevYear).sort();
+        const j=await alJson('https://archive-api.open-meteo.com/v1/archive?latitude='+g.lat+'&longitude='+g.lng+'&start_date='+sh[0]+'&end_date='+sh[sh.length-1]+'&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_gusts_10m_max,snowfall_sum&timezone=auto');
+        const D=j.daily||{};
+        rest.forEach(d=>{const i=(D.time||[]).indexOf(alPrevYear(d));if(i>=0)got[d]={code:D.weather_code[i],hi:alRound(D.temperature_2m_max[i]),lo:alRound(D.temperature_2m_min[i]),rain:alRound(D.precipitation_sum[i]),pop:null,gust:alRound(D.wind_gusts_10m_max[i]),snow:alRound(D.snowfall_sum[i]),kind:'lastyear'};});
+      }catch(e){wxErr.push('last year: '+(e.name==='AbortError'?'timed out':e.message));}
+    }
+    Object.assign(wx,got);
+  }));
+  if(Object.keys(wx).length){keep.wx=wx;keep.at.wx=Date.now();keep.err.wx=wxErr.length?'Partly loaded ('+wxErr.join('; ')+')':'';}
+  else keep.err.wx=wxErr.join('; ')||'No weather came back.';
+  /* earthquakes: last 14 days, M4.5+, within 300 km of any place on the route */
+  const since=toISO(new Date(Date.now()-14*864e5));
+  const eqs={};let eqErr=[],eqOk=false;
+  await Promise.all(G.map(async g=>{
+    try{
+      const j=await alJson('https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&starttime='+since+'&minmagnitude=4.5&latitude='+g.lat+'&longitude='+g.lng+'&maxradiuskm=300&orderby=time&limit=50');
+      eqOk=true;
+      (j.features||[]).forEach(f=>{const p=f.properties||{},c=(f.geometry||{}).coordinates||[];eqs[f.id]={id:f.id,mag:p.mag,place:p.place||'',time:p.time,depth:c[2],lat:c[1],lng:c[0],tsunami:!!p.tsunami,url:p.url||''};});
+    }catch(e){eqErr.push(e.name==='AbortError'?'timed out':e.message);}
+  }));
+  if(eqOk){
+    keep.eq=Object.values(eqs).map(q=>{
+      const near=days.filter(d=>kmBetween(locs[d],{lat:q.lat,lng:q.lng})<=300);
+      q.days=near;q.km=Math.round(Math.min(...days.map(d=>kmBetween(locs[d],{lat:q.lat,lng:q.lng}))));return q;
+    }).sort((a,b)=>b.time-a.time);
+    keep.at.eq=Date.now();keep.err.eq=eqErr.length?'Partly loaded ('+eqErr.join('; ')+')':'';
+  }else keep.err.eq=eqErr.join('; ')||'No earthquake data came back.';
+  keep.trip=selTrip;keep.loc=locs;keep.sig=alSig(locs);alData=keep;alBusy=false;alSave();alUpdate();
+}
+/* refresh when the pinned places changed, or the data is over 3 hours old; never more than once in 10 minutes for the same places */
+let alLast={sig:'',at:0};
+const alSig=locs=>Object.entries(locs).map(([d,l])=>d+l.lat.toFixed(1)+l.lng.toFixed(1)).join('|');
+function alMaybeRefresh(){
+  if(!trip()||alBusy)return;
+  const locs=alDayLocs();if(!Object.keys(locs).length)return;
+  const sig=alSig(locs),old=Date.now()-Math.min(alData.at.wx||0,alData.at.eq||0)>=3*36e5;
+  if(alMine()&&alData.sig===sig&&!old)return;
+  if(alLast.sig===sig&&Date.now()-alLast.at<6e5)return;
+  if(navigator.onLine===false)return;
+  alLast={sig,at:Date.now()};alRefresh();
+}
+function wxFlags(w){
+  const f=[];if(!w||w.kind!=='forecast')return f;
+  if([95,96,99].includes(w.code))f.push({level:'warn',text:'Thunderstorms forecast'});
+  if(w.gust>=90)f.push({level:'warn',text:'Very strong gusts up to '+Math.round(w.gust)+' km/h: flights, ferries and trains may be disrupted'});
+  else if(w.gust>=60)f.push({level:'caution',text:'Strong gusts up to '+Math.round(w.gust)+' km/h: ferries, flights and exposed sights may be affected'});
+  if(w.rain>=40||(w.rain>=25&&[65,82].includes(w.code)))f.push({level:'warn',text:'Heavy rain forecast ('+Math.round(w.rain)+' mm)'});
+  else if(w.rain>=10&&(w.pop==null||w.pop>=50))f.push({level:'caution',text:'Rain likely ('+Math.round(w.rain)+' mm'+(w.pop!=null?', '+w.pop+'% chance':'')+'): consider indoor options'});
+  if(w.snow>=10)f.push({level:'warn',text:'Heavy snow forecast ('+Math.round(w.snow)+' cm): expect transport delays'});
+  else if(w.snow>=2)f.push({level:'caution',text:'Snow forecast ('+Math.round(w.snow)+' cm)'});
+  if(w.hi>=35)f.push({level:'caution',text:'Very hot (up to '+Math.round(w.hi)+'°C)'});
+  if(w.lo<=-5)f.push({level:'caution',text:'Very cold (down to '+Math.round(w.lo)+'°C)'});
+  return f;
+}
+const agoTxt=ms=>{const h=Math.round((Date.now()-ms)/36e5);return h<1?'less than an hour ago':h<48?h+' h ago':Math.round(h/24)+' days ago';};
+const eqLevel=q=>q.tsunami||q.mag>=6?'warn':q.mag>=5?'caution':'info';
+function alAlertsFor(d){
+  const out=[];
+  if(alMine()){
+    wxFlags(alData.wx[d]).forEach(f=>out.push({level:f.level,src:'Weather',text:f.text}));
+    const l=alData.loc[d];
+    (alData.eq||[]).filter(q=>q.mag>=5&&Date.now()-q.time<7*864e5&&l&&kmBetween(l,{lat:q.lat,lng:q.lng})<=150).forEach(q=>out.push({level:eqLevel(q),src:'Earthquake',qid:q.id,text:'M'+q.mag.toFixed(1)+' earthquake '+agoTxt(q.time)+', '+q.place+(q.tsunami?' (tsunami flag set)':''),url:q.url}));
+  }
+  const t=trip();((t&&t.days[d]&&t.days[d].alerts)||[]).forEach(a=>out.push({level:a.level||'info',src:'Yours',text:a.text,url:a.link,manual:true,id:a.id,date:d}));
+  return out.sort((a,b)=>AL_LV[a.level][1]-AL_LV[b.level][1]);
+}
+function alRowHtml(a){
+  return '<div class="al '+a.level+'"><span class="allv">'+AL_LV[a.level][0]+'</span><span class="altx">'+esc(a.text)+(a.url?' <a href="'+esc(a.url)+'" target="_blank" rel="noopener">more</a>':'')+'</span><span class="alsrc">'+esc(a.src)+'</span>'+(a.manual?'<button class="x nop" data-act="alertdel" data-date="'+esc(a.date)+'" data-id="'+esc(a.id)+'" aria-label="Remove alert" title="Remove">&times;</button>':'')+'</div>';
+}
+function alWxLine(d){
+  const w=alMine()?alData.wx[d]:null;if(!w)return '';
+  const [nm,ic]=wxInfo(w.code);
+  return '<span class="alwx" title="'+(w.kind==='forecast'?'Forecast (Open-Meteo)':'Typical: the weather on this date last year')+'">'+ic+' '+esc(nm)+' · '+Math.round(w.hi)+'° / '+Math.round(w.lo)+'°C'+(w.pop!=null?' · rain '+w.pop+'%':w.rain!=null?' · '+Math.round(w.rain)+' mm':'')+(w.kind==='lastyear'?' <i>(last year)</i>':'')+'</span>';
+}
+/* the box at the top of the Day view, under the day notes */
+function alBoxInner(d){
+  const list=alAlertsFor(d),opts=tripItems().filter(i=>i.type==='placeholder'&&i.date===d);
+  let h='<div class="alhd"><b>Alerts</b>'+alWxLine(d)+(alBusy?'<span class="hint">checking…</span>':'')+'<span class="sp"></span><button class="btn sm nop" data-act="alertadd" data-date="'+esc(d)+'">+ Add alert</button><button class="btn sm nop" data-act="alertview">All alerts</button></div>';
+  if(list.length){h+=list.map(alRowHtml).join('');
+    if(opts.length&&list.some(a=>a.level!=='info'))h+='<div class="alopt">Options saved for this day: '+opts.map(o=>'<button class="linkbtn" data-act="open" data-id="'+esc(o.id)+'">'+esc(o.title)+'</button>').join(', ')+'</div>';}
+  else h+='<div class="alnone">'+(alMine()&&alData.loc[d]&&alData.at.wx?'Nothing to flag for this day.':!Object.keys(alDayLocs()).length?'No alerts yet. Pin a hotel on the map (Find on map) to get weather and earthquake checks.':'No alerts yet'+(alData.err.wx?': '+esc(alData.err.wx):' (checking weather…)'))+'</div>';
+  return h;
+}
+function alertBoxHtml(d){alMaybeRefresh();return '<div class="alertbox" id="alertbox">'+alBoxInner(d)+'</div>';}
+function alBadge(){
+  const b=$('#viewSeg button[data-view=alerts]');if(!b||!trip())return;
+  const seen=new Set();let n=0;
+  tripDays(trip()).forEach(d=>alAlertsFor(d).forEach(a=>{if(a.level==='info')return;if(a.qid){if(seen.has(a.qid))return;seen.add(a.qid);}n++;}));
+  b.innerHTML='Alerts'+(n?' <span class="albadge">'+n+'</span>':'');
+}
+function alUpdate(){
+  const box=$('#alertbox');if(box&&view==='day'&&selDate)box.innerHTML=alBoxInner(selDate);
+  if(view==='alerts')renderAlerts();
+  alBadge();
+}
+const AL_LINKS=trip=>{
+  const txt=((trip&&(trip.name+' '+trip.region))||'')+' '+tripItems().map(i=>i.title+' '+(i.place||'')+' '+(i.from||'')+' '+(i.to||'')).join(' ');
+  const L=[['Smartraveller: all destinations','https://www.smartraveller.gov.au/destinations','Australian Government travel advice and alerts']];
+  if(/japan|tokyo|osaka|kyoto|nagano|matsumoto|kanazawa|hokkaido|nara|hiroshima|fukuoka|shinjuku|haneda|narita/i.test(txt)){
+    L.unshift(['Smartraveller: Japan','https://www.smartraveller.gov.au/destinations/asia/japan','Advice level, natural disasters, local laws']);
+    L.push(['Japan Safe Travel (JNTO)','https://www.japan.travel/en/japan-safe-travel-information/','Disaster news plus links to JR, metro and airport operation status']);
+    L.push(['JMA: weather warnings','https://www.jma.go.jp/bosai/warning/#lang=en','Japan Meteorological Agency warnings and advisories (English)']);
+    L.push(['JMA: typhoons','https://www.jma.go.jp/en/typh/','Typhoon tracks and forecasts']);
+    L.push(['JMA: earthquakes and tsunami','https://www.jma.go.jp/bosai/map.html#contents=earthquake_map&lang=en','Latest earthquake and tsunami information']);
+  }
+  L.push(['USGS: latest earthquakes','https://earthquake.usgs.gov/earthquakes/map/','Live world map of recent earthquakes']);
+  L.push(['Open-Meteo','https://open-meteo.com/','Where the forecasts on this page come from']);
+  return L;
+};
+function renderAlerts(){
+  const t=trip(),days=tripDays(t);
+  const stat=(k,lab)=>{const at=alData.at[k],er=alData.err[k];return '<span class="alstat '+(at&&!er?'ok':at?'part':'bad')+'"><b>'+lab+'</b> '+(alBusy?'checking…':at?'updated '+agoTxt(at)+(er?' · '+esc(er):''):esc(er||'not loaded yet'))+'</span>';};
+  let h='<div class="alview"><div class="alhd"><h2 style="margin:0">Alerts and conditions</h2><span class="sp"></span><button class="btn" data-act="alertadd" data-date="'+esc(selDate||days[0]||'')+'">+ Add alert</button><button class="btn primary" data-act="alertrefresh" '+(alBusy?'disabled':'')+'>'+(alBusy?'Checking…':'Refresh now')+'</button></div>'+
+    '<div class="alstats">'+stat('wx','Weather')+stat('eq','Earthquakes')+'</div>';
+  /* needs attention */
+  const all=[],seenQ=new Set();days.forEach((d,ix)=>alAlertsFor(d).forEach(a=>{if(a.qid){if(seenQ.has(a.qid))return;seenQ.add(a.qid);}all.push(Object.assign({d,ix},a));}));
+  h+='<h3>Needs attention</h3>';
+  const important=all.filter(a=>a.level!=='info'||a.manual);
+  h+=important.length?important.map(a=>'<div class="alday"><button class="linkbtn" data-act="godate" data-date="'+esc(a.d)+'">Day '+(a.ix+1)+' · '+esc(fmtShort(a.d))+'</button>'+alRowHtml(a)+'</div>').join(''):'<div class="alnone">Nothing flagged for any day of this trip'+(alMine()&&alData.at.wx?'.':' yet; weather and earthquake checks have not loaded.')+'</div>';
+  /* weather table */
+  h+='<h3>Weather by day</h3><div class="tl-wrap"><table class="altable"><thead><tr><th>Day</th><th>Near</th><th>Conditions</th><th>High / low</th><th>Rain</th><th>Gusts</th><th>Basis</th></tr></thead><tbody>'+days.map((d,ix)=>{
+    const w=alMine()?alData.wx[d]:null,l=alMine()?alData.loc[d]:null;
+    if(!w)return '<tr><td><button class="linkbtn" data-act="godate" data-date="'+esc(d)+'">Day '+(ix+1)+'</button> '+esc(fmtShort(d))+'</td><td colspan="6" class="hint">'+(l?'no data':'no pinned place yet')+'</td></tr>';
+    const [nm,ic]=wxInfo(w.code);
+    return '<tr><td><button class="linkbtn" data-act="godate" data-date="'+esc(d)+'">Day '+(ix+1)+'</button> '+esc(fmtShort(d))+'</td><td>'+esc((l&&l.label)||'')+'</td><td>'+ic+' '+esc(nm)+'</td><td>'+Math.round(w.hi)+'° / '+Math.round(w.lo)+'°C</td><td>'+(w.pop!=null?w.pop+'% · ':'')+(w.rain!=null?w.rain+' mm':'')+'</td><td>'+(w.gust!=null?Math.round(w.gust)+' km/h':'')+'</td><td>'+(w.kind==='forecast'?'Forecast':'<i>Same date last year</i>')+'</td></tr>';
+  }).join('')+'</tbody></table></div>';
+  /* earthquakes */
+  const eq=alMine()?(alData.eq||[]):[];
+  h+='<h3>Recent earthquakes near your route</h3><div class="hint" style="margin-bottom:6px">Last 14 days, magnitude 4.5 and above, within 300 km of where you will be. Earthquakes cannot be forecast, so this shows recent activity only. Source: USGS.</div>';
+  h+=eq.length?'<div class="tl-wrap"><table class="altable"><thead><tr><th>Mag</th><th>Where</th><th>When</th><th>Closest stop</th><th>Days affected</th><th></th></tr></thead><tbody>'+eq.map(q=>'<tr class="'+eqLevel(q)+'"><td><b>M'+q.mag.toFixed(1)+'</b>'+(q.tsunami?' 🌊':'')+'</td><td>'+esc(q.place)+'</td><td>'+agoTxt(q.time)+'</td><td>'+q.km+' km</td><td>'+(q.days.map(d=>'D'+(days.indexOf(d)+1)).join(', ')||'—')+'</td><td>'+(q.url?'<a href="'+esc(q.url)+'" target="_blank" rel="noopener">details</a>':'')+'</td></tr>').join('')+'</tbody></table></div>':'<div class="alnone">'+(alMine()&&alData.at.eq?'No earthquakes of magnitude 4.5 or more near your route in the last 14 days.':'Not loaded yet.')+'</div>';
+  /* official sources */
+  h+='<h3>Official warnings and transport status</h3><div class="hint" style="margin-bottom:6px">Government warnings and train or airline disruption have no public feed this page can read, so check these before each travel day. Use <b>+ Add alert</b> to record anything you find; it then shows on that day.</div><div class="allinks">'+AL_LINKS(t).map(l=>'<a class="allink" href="'+esc(l[1])+'" target="_blank" rel="noopener"><b>'+esc(l[0])+'</b><span>'+esc(l[2])+'</span></a>').join('')+'</div>';
+  h+='<p class="hint" style="margin-top:14px">Forecasts only reach 16 days ahead; later days show the weather on the same date last year, as a guide only. Weather comes from Open-Meteo and earthquakes from USGS; each check needs an internet connection and the last result is kept for offline use.</p></div>';
+  $('#main').innerHTML=h;
+}
+function openAlertDialog(date){
+  const t=trip();if(!t)return;
+  const dlg=$('#dlg'),days=tripDays(t);
+  dlg.innerHTML='<div class="dbody"><div class="dh"><span>Add alert</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
+    '<label class="f"><span>Day</span><select id="a_date">'+days.map((d,i)=>'<option value="'+esc(d)+'"'+(d===date?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select></label>'+
+    '<label class="f"><span>Level</span><select id="a_level"><option value="caution">Caution</option><option value="warn">Warning</option><option value="info">Info</option></select></label>'+
+    '<label class="f"><span>What is happening</span><textarea id="a_text" rows="3" placeholder="e.g. JR strike on the Chuo Line, typhoon warning for Kyushu, line suspended"></textarea></label>'+
+    '<label class="f"><span>Link (optional)</span><input id="a_link" type="url" placeholder="https://"></label>'+
+    '</div><div class="df"><button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="alertsave">Save alert</button></div></div>';
+  dlg.onclose=null;if(!dlg.open)dlg.showModal();
+  setTimeout(()=>{const e=$('#a_text');if(e)e.focus();},50);
+}
+function saveAlert(){
+  const t=trip(),d=$('#a_date').value,text=$('#a_text').value.trim();
+  if(!text){toast('Please say what the alert is.');return;}
+  const day=t.days[d]=t.days[d]||{};day.alerts=day.alerts||[];
+  let link=($('#a_link').value||'').trim();if(link&&!/^https?:\/\//i.test(link))link='https://'+link;
+  day.alerts.push({id:uid(),level:$('#a_level').value,text,link,created:Date.now()});
+  $('#dlg').close();changed();renderAll();toast('Alert added.');
+}
+function delAlert(d,id){
+  const t=trip(),day=t&&t.days[d];if(!day||!day.alerts)return;
+  day.alerts=day.alerts.filter(a=>a.id!==id);changed();renderAll();
+}
 /* ============ EXPORT ITINERARY TO PDF ============ */
 const JSPDF_URL='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 let jspdfReady=null;
@@ -2322,6 +2537,11 @@ function onAct(el,e){
     case 'data':openData();break;
     case 'print':window.print();break;
     case 'exportpdf':openExportPdf();break;
+    case 'alertadd':openAlertDialog(el.dataset.date||selDate);break;
+    case 'alertsave':saveAlert();break;
+    case 'alertdel':delAlert(el.dataset.date,el.dataset.id);break;
+    case 'alertrefresh':alRefresh();break;
+    case 'alertview':view='alerts';try{localStorage.setItem(LS_VIEW,view);}catch(x){}renderAll();break;
     case 'doexportpdf':doExportPdf();break;
     case 'addmenu':{
       if(!trip()){toast('Create or import a trip first.');break;}
@@ -2462,7 +2682,7 @@ window.__travel={geoCands,geoFind,geoClean,openNote,renderNotes,srcById,attBlob,
   try{const c=localStorage.getItem(LS_KEY);if(c)data=normalise(JSON.parse(c));}catch(e){}
   try{dirty=localStorage.getItem(LS_DIRTY)==='1';}catch(e){}
   try{selTrip=localStorage.getItem(LS_SEL);view=localStorage.getItem(LS_VIEW)||'day';}catch(e){}
-  if(!['day','timeline','map','reports','notes'].includes(view))view='day';
+  if(!['day','timeline','map','alerts','reports','notes'].includes(view))view='day';
   renderAll();setStatus('local');
   if(msalConfigured()&&window.msal){
     try{
