@@ -253,7 +253,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.2';
+const VERSION = '2026-11-22 · travel manager v3.3';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -2206,7 +2206,7 @@ async function alRefresh(){
   const locs=alDayLocs(),days=Object.keys(locs);
   if(!days.length){toast('Nothing is pinned on the map yet. Use Find on map on a hotel first.');return;}
   alBusy=true;alUpdate();
-  const keep=alMine()?alData:{trip:selTrip,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},feeds:{gd:[],q:[],ts:[],jma:[]}};
+  const keep=alMine()?alData:{trip:selTrip,wx:{},eq:[],at:{wx:0,eq:0},err:{},loc:{},cc:alData.cc||{},feeds:{gd:[],q:[],ts:[],jma:[]}};
   const groups={};
   days.forEach(d=>{const l=locs[d],k=l.lat.toFixed(1)+','+l.lng.toFixed(1);(groups[k]=groups[k]||{lat:l.lat,lng:l.lng,label:l.label,days:[]}).days.push(d);});
   const G=Object.values(groups);
@@ -2248,6 +2248,8 @@ async function alRefresh(){
     }).sort((a,b)=>b.time-a.time);
     keep.at.eq=Date.now();keep.err.eq=eqErr.length?'Partly loaded ('+eqErr.join('; ')+')':'';
   }else keep.err.eq=eqErr.join('; ')||'No earthquake data came back.';
+  await alDetect(locs);
+  keep.cc=alData.cc;
   const fz=await alFeeds(locs);
   keep.feeds=Object.assign({},keep.feeds||{},Object.fromEntries(Object.keys(fz.feeds).filter(k=>({gd:'gd',q:'p2p',ts:'p2p',jma:'jma'}[k]) in fz.at).map(k=>[k,fz.feeds[k]])));
   Object.assign(keep.at,fz.at);Object.keys(fz.err).forEach(k=>{keep.err[k]=fz.err[k];});
@@ -2267,7 +2269,39 @@ function alMaybeRefresh(){
 }
 /* ---- live official feeds, tried straight from the browser (each reports its own result) ---- */
 const AL_PREFS=[['016000','Hokkaido',43.06,141.35],['020000','Aomori',40.82,140.74],['030000','Iwate',39.70,141.15],['040000','Miyagi',38.27,140.87],['050000','Akita',39.72,140.10],['060000','Yamagata',38.24,140.36],['070000','Fukushima',37.75,140.47],['080000','Ibaraki',36.34,140.45],['090000','Tochigi',36.57,139.88],['100000','Gunma',36.39,139.06],['110000','Saitama',35.86,139.65],['120000','Chiba',35.61,140.12],['130000','Tokyo',35.69,139.69],['140000','Kanagawa',35.45,139.64],['150000','Niigata',37.90,139.02],['160000','Toyama',36.70,137.21],['170000','Ishikawa',36.56,136.66],['180000','Fukui',36.07,136.22],['190000','Yamanashi',35.66,138.57],['200000','Nagano',36.65,138.18],['210000','Gifu',35.39,136.72],['220000','Shizuoka',34.98,138.38],['230000','Aichi',35.18,136.91],['240000','Mie',34.73,136.51],['250000','Shiga',35.00,135.87],['260000','Kyoto',35.02,135.76],['270000','Osaka',34.69,135.52],['280000','Hyogo',34.69,135.18],['290000','Nara',34.69,135.83],['300000','Wakayama',34.23,135.17],['310000','Tottori',35.50,134.24],['320000','Shimane',35.47,133.05],['330000','Okayama',34.66,133.93],['340000','Hiroshima',34.40,132.46],['350000','Yamaguchi',34.19,131.47],['360000','Tokushima',34.07,134.56],['370000','Kagawa',34.34,134.04],['380000','Ehime',33.84,132.77],['390000','Kochi',33.56,133.53],['400000','Fukuoka',33.61,130.42],['410000','Saga',33.25,130.30],['420000','Nagasaki',32.74,129.87],['430000','Kumamoto',32.79,130.74],['440000','Oita',33.24,131.61],['450000','Miyazaki',31.91,131.42],['460100','Kagoshima',31.56,130.56],['471000','Okinawa',26.21,127.68]];
-const alInJapan=l=>l&&l.lat>=24&&l.lat<=46&&l.lng>=122&&l.lng<=154;
+/* country registry: how Alerts adapts to where the trip is. Add a country here to give it its own links and notes. */
+const AL_SM='https://www.smartraveller.gov.au/destinations/';
+const AL_CTRY={
+  JP:{name:'Japan',rx:/japan|tokyo|osaka|kyoto|nagano|matsumoto|kanazawa|hokkaido|nara\b|hiroshima|fukuoka|shinjuku|haneda|narita/i,box:[24,46,122,154],sm:'asia/japan',emerg:'Police 110 · Ambulance and fire 119',live:'P2P Quake and JMA warnings',
+    links:[['Japan Safe Travel (JNTO)','https://www.japan.travel/en/japan-safe-travel-information/','Disaster news plus links to JR, metro and airport operation status'],['JMA: weather warnings','https://www.jma.go.jp/bosai/warning/#lang=en','Japan Meteorological Agency warnings and advisories (English)'],['JMA: typhoons','https://www.jma.go.jp/en/typh/','Typhoon tracks and forecasts'],['JMA: earthquakes and tsunami','https://www.jma.go.jp/bosai/map.html#contents=earthquake_map&lang=en','Latest earthquake and tsunami information']]},
+  FJ:{name:'Fiji',rx:/\bfiji\b|nadi\b|suva\b|denarau|viti levu|vanua levu|mamanuca|yasawa|lautoka|coral coast|savusavu|taveuni/i,box:[-21.1,-12.4,176.8,180],box2:[-21.1,-12.4,-180,-178],sm:'pacific/fiji',emerg:'Police 917 · Ambulance 911 · Fire 910',season:'Cyclone season runs November to April (cyclones can occur at other times).',
+    links:[['Fiji Meteorological Service','https://www.met.gov.fj/','Official weather, cyclone and tsunami warnings for Fiji'],['Pacific Tsunami Warning Center','https://www.tsunami.gov/','Official tsunami bulletins for the Pacific'],['Smartraveller: cyclones','https://www.smartraveller.gov.au/before-you-go/staying-safe/extreme-weather-and-natural-disasters/cyclones','What to do before and during a cyclone, and cyclone tracking services'],['Smartraveller: Pacific region','https://www.smartraveller.gov.au/destinations/Pacific','Pacific cyclone season news for all island destinations']]}
+};
+const alBox=(l,b)=>b&&l.lat>=b[0]&&l.lat<=b[1]&&l.lng>=b[2]&&l.lng<=b[3];
+function alCountry(l){
+  if(!l)return null;
+  for(const k in AL_CTRY){const c=AL_CTRY[k];if(alBox(l,c.box)||alBox(l,c.box2))return {code:k,name:c.name};}
+  const hit=(alData.cc||{})[l.lat.toFixed(0)+','+l.lng.toFixed(0)];
+  return hit?{code:hit.code,name:hit.name}:null;
+}
+const alInJapan=l=>{const c=alCountry(l);return !!c&&c.code==='JP';};
+/* places outside the registry are looked up once (OpenStreetMap Nominatim, country level) and remembered */
+async function alDetect(locs){
+  alData.cc=alData.cc||{};
+  const todo={};Object.values(locs).forEach(l=>{if(!alCountry(l))todo[l.lat.toFixed(0)+','+l.lng.toFixed(0)]=l;});
+  await Promise.all(Object.entries(todo).map(async([k,l])=>{
+    try{const j=await alJson('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=3&accept-language=en&lat='+l.lat+'&lon='+l.lng);
+      const cc=String((j.address||{}).country_code||'').toUpperCase();if(cc)alData.cc[k]={code:cc,name:(j.address||{}).country||cc};}catch(e){}
+  }));
+}
+/* countries of this trip, from pinned places first, else from the trip text */
+function alTripCountries(trip){
+  const out=[],seen=new Set(),add=c=>{if(c&&!seen.has(c.code)){seen.add(c.code);out.push(c);}};
+  if(alMine())Object.values(alData.loc||{}).forEach(l=>add(alCountry(l)));
+  if(!out.length){const txt=((trip&&(trip.name+' '+trip.region))||'')+' '+tripItems().map(i=>i.title+' '+(i.place||'')+' '+(i.from||'')+' '+(i.to||'')).join(' ');
+    Object.keys(AL_CTRY).forEach(k=>{if(AL_CTRY[k].rx.test(txt))add({code:k,name:AL_CTRY[k].name});});}
+  return out;
+}
 function alPref(l){let best=null,bd=1e9;AL_PREFS.forEach(p=>{const k=kmBetween(l,{lat:p[2],lng:p[3]});if(k<bd){bd=k;best=p;}});return best&&bd<=120?best:null;}
 const alErr=e=>e&&e.name==='AbortError'?'timed out':e&&/Failed to fetch|NetworkError|Load failed/i.test(e.message||'')?'could not be read from this page (offline, or the site does not allow web pages to read it)':(e&&e.message)||'failed';
 const p2pTime=s=>{const t=Date.parse(String(s||'').replace(/\//g,'-').replace(' ','T')+'+09:00');return isNaN(t)?0:t;};
@@ -2373,24 +2407,26 @@ function alUpdate(){
   alBadge();
 }
 const AL_LINKS=trip=>{
-  const txt=((trip&&(trip.name+' '+trip.region))||'')+' '+tripItems().map(i=>i.title+' '+(i.place||'')+' '+(i.from||'')+' '+(i.to||'')).join(' ');
-  const L=[['Smartraveller: all destinations','https://www.smartraveller.gov.au/destinations','Australian Government travel advice and alerts']];
-  if(/japan|tokyo|osaka|kyoto|nagano|matsumoto|kanazawa|hokkaido|nara|hiroshima|fukuoka|shinjuku|haneda|narita/i.test(txt)){
-    L.unshift(['Smartraveller: Japan','https://www.smartraveller.gov.au/destinations/asia/japan','Advice level, natural disasters, local laws']);
-    L.push(['Japan Safe Travel (JNTO)','https://www.japan.travel/en/japan-safe-travel-information/','Disaster news plus links to JR, metro and airport operation status']);
-    L.push(['JMA: weather warnings','https://www.jma.go.jp/bosai/warning/#lang=en','Japan Meteorological Agency warnings and advisories (English)']);
-    L.push(['JMA: typhoons','https://www.jma.go.jp/en/typh/','Typhoon tracks and forecasts']);
-    L.push(['JMA: earthquakes and tsunami','https://www.jma.go.jp/bosai/map.html#contents=earthquake_map&lang=en','Latest earthquake and tsunami information']);
-  }
+  const cs=alTripCountries(trip),L=[];
+  cs.forEach(c=>{const r=AL_CTRY[c.code];
+    L.push(r&&r.sm?['Smartraveller: '+c.name,AL_SM+r.sm,'Advice level, natural disasters, local laws']:['Smartraveller: find '+c.name,'https://www.smartraveller.gov.au/destinations','Opens the destinations list; pick '+c.name+' for its advice level']);
+    if(r)r.links.forEach(x=>L.push(x));});
+  L.push(['Smartraveller: all destinations','https://www.smartraveller.gov.au/destinations','Australian Government travel advice and alerts']);
+  L.push(['GDACS: global disaster alerts','https://www.gdacs.org/','Earthquakes, cyclones, floods and volcanoes worldwide']);
   L.push(['USGS: latest earthquakes','https://earthquake.usgs.gov/earthquakes/map/','Live world map of recent earthquakes']);
   L.push(['Open-Meteo','https://open-meteo.com/','Where the forecasts on this page come from']);
   return L;
 };
+function alCountryBanner(t){
+  const cs=alTripCountries(t);
+  if(!cs.length)return '<div class="hint" style="margin-bottom:6px">Destination country not recognised yet. Pin a hotel on the map (Find on map) and press Refresh now; global feeds (weather, USGS, GDACS) still apply.</div>';
+  return '<div class="hint" style="margin-bottom:6px"><b>Travelling in:</b> '+cs.map(c=>esc(c.name)).join(', ')+(cs.map(c=>AL_CTRY[c.code]).filter(r=>r&&(r.emerg||r.season)).map(r=>'<br>'+esc(r.name)+': '+esc([r.emerg,r.season].filter(Boolean).join(' · '))).join(''))+'</div>';
+}
 function renderAlerts(){
   const t=trip(),days=tripDays(t);
   const stat=(k,lab)=>{const at=alData.at[k],er=alData.err[k];return '<span class="alstat '+(at&&!er?'ok':at?'part':'bad')+'"><b>'+lab+'</b> '+(alBusy?'checking…':at?'updated '+agoTxt(at)+(er?' · '+esc(er):''):esc(er||'not loaded yet'))+'</span>';};
   let h='<div class="alview"><div class="alhd"><h2 style="margin:0">Alerts and conditions</h2><span class="sp"></span><button class="btn" data-act="alertadd" data-date="'+esc(selDate||days[0]||'')+'">+ Add alert</button><button class="btn primary" data-act="alertrefresh" '+(alBusy?'disabled':'')+'>'+(alBusy?'Checking…':'Refresh now')+'</button></div>'+
-    '<div class="alstats">'+stat('wx','Weather')+stat('eq','Earthquakes')+stat('gd','Disaster alerts (GDACS)')+(Object.values(alData.loc||{}).some(alInJapan)?stat('p2p','Japan quakes and tsunami (P2P Quake)')+stat('jma','JMA warnings'):'')+'</div>';
+    alCountryBanner(t)+'<div class="alstats">'+stat('wx','Weather')+stat('eq','Earthquakes')+stat('gd','Disaster alerts (GDACS)')+(Object.values(alData.loc||{}).some(alInJapan)?stat('p2p','Japan quakes and tsunami (P2P Quake)')+stat('jma','JMA warnings'):'')+'</div>';
   /* needs attention */
   const all=[],seenQ=new Set();days.forEach((d,ix)=>alAlertsFor(d).forEach(a=>{if(a.qid){if(seenQ.has(a.qid))return;seenQ.add(a.qid);}all.push(Object.assign({d,ix},a));}));
   h+='<h3>Needs attention</h3>';
