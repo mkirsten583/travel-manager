@@ -253,7 +253,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.4';
+const VERSION = '2026-11-22 · travel manager v3.5';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -2198,6 +2198,7 @@ function alDayLocs(){
   const first=days.find(d=>out[d]);if(first)days.forEach(d=>{if(!out[d])out[d]=out[first];});
   return out;
 }
+const alJsonOpt=async(url)=>{const c=new AbortController(),to=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);const s=(await r.text()).trim();if(!s)return null;try{return JSON.parse(s);}catch(e){throw new Error('unreadable reply from the service');}}finally{clearTimeout(to);}};
 const alJson=async(url)=>{const c=new AbortController(),to=setTimeout(()=>c.abort(),15000);try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}finally{clearTimeout(to);}};
 const alPrevYear=d=>(+d.slice(0,4)-1)+d.slice(4);
 const alRound=n=>n==null?null:Math.round(n*10)/10;
@@ -2324,7 +2325,11 @@ async function alFeeds(locs){
   const tasks=[];
   tasks.push(['gd',async()=>{
     const from=toISO(new Date(Date.now()-10*864e5)),to=toISO(new Date(Date.now()+864e5));
-    const j=await alJson('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ;TC;VO;FL&fromdate='+from+'&todate='+to+'&alertlevel=orange;red');
+    /* GDACS answers with an empty body when nothing matches, so an empty reply means "no events"; retry once without the alert filter and filter here */
+    const base='https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ;TC;VO;FL&fromdate='+from+'&todate='+to;
+    let j=await alJsonOpt(base+'&alertlevel=orange;red');
+    if(!j)j=await alJsonOpt(base)||{features:[]};
+    j.features=(j.features||[]).filter(f=>/orange|red/i.test(String(((f||{}).properties||{}).alertlevel||'')));
     out.feeds.gd=(j.features||[]).map(f=>{const p=f.properties||{},c=(f.geometry||{}).coordinates||[];return {id:'gd'+p.eventtype+p.eventid,type:p.eventtype,name:p.name||p.description||'',level:String(p.alertlevel||'').toLowerCase(),from:String(p.fromdate||'').slice(0,10),to:String(p.todate||'').slice(0,10),current:String(p.iscurrent)==='true',lat:c[1],lng:c[0],country:p.country||'',url:(p.url&&p.url.report)||'',sev:(p.severitydata&&p.severitydata.severitytext)||''};}).filter(g=>g.lat!=null);
   }]);
   if(jp){
