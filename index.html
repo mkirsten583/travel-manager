@@ -254,7 +254,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.6';
+const VERSION = '2026-11-22 · travel manager v3.7';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -1643,7 +1643,7 @@ function renderItemDialog(first){
   const bkBlk='<div class="blk"><h4>'+ico('clip')+'Booking</h4><div class="grid3">'+fld('Status','<select id="f_bk">'+BK_STATUS.map(s=>'<option value="'+s[0]+'"'+(s[0]===(d.bk||'')?' selected':'')+'>'+s[1]+'</option>').join('')+'</select>')+fld(rail?'Booking number':'Price',inp('f_price',d.price,'text',rail?'e.g. booking or reservation number':'e.g. A$465.83 total'))+(tr?fld('Service / operator',inp('f_svc',d.svc,'text','e.g. Narita Express')):fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. 8:00 PM, 2 people, counter')))+'</div>'+fld('How to book / contact',inp('f_how',d.how,'text','Website, phone, or who to ask'))+(tr?fld('Booking note',inp('f_bknote',d.bkNote,'text','e.g. reservation mandatory')):'')+(tr?'<label class="chk" style="margin-top:6px"><input type="checkbox" id="f_valid"'+(d.valid?' checked':'')+'> <b>✓ Validated</b> — route, times and booking checked</label>':'')+'</div>';
   const dlg=$('#dlg');
   dlg.innerHTML='<div class="dbody k-'+d.type+'"><div class="dh">'+ico(tr?iconFor(d):ty.icon)+'<span>'+(ed.isNew?'Add ':'Edit ')+(d.type==='placeholder'?'placeholder':ty.add.toLowerCase())+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+f+(d.type==='placeholder'?'':bkBlk)+
-    '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:90px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
+    '<div class="blk" data-zone="file"><h4>'+ico('note')+'Notes, screenshots &amp; documents</h4><textarea id="f_notes" style="width:100%;min-height:270px;font:inherit;font-size:14px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:7px 9px" placeholder="Notes for this item">'+esc(d.notes)+'</textarea>'+
     '<div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop files or PDFs, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose PDFs / files</button></div><div class="atts" id="attsFile"></div></div>'+
     '<div class="blk" data-zone="map"><h4>'+ico('map')+(tr?'Route map':'Location map')+'</h4><div class="grid2">'+fld('Map link (Google Maps, etc.)',inp('f_maplink',d.mapLink,'url','https://maps.app.goo.gl/…'))+'<div class="f"><span>&nbsp;</span><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn" data-act="findmap">'+(tr?'Find both ends':'Find on map')+'</button><button type="button" class="btn" data-act="clearmap" title="Remove the map link and the pin for this item">Remove link &amp; pin</button><a class="btn" id="gmLink" target="_blank" rel="noopener">Open in Google Maps</a></div></div></div>'+
     '<div class="'+(tr?'grid2':'')+'">'+(tr?fld('From — coordinates (latitude, longitude) or a place name',inp('f_llfrom',fmtLL(d.fromCoord),'text','e.g. 35.6812, 139.7671'))+fld('To — coordinates (latitude, longitude) or a place name',inp('f_llto',fmtLL(d.toCoord),'text','e.g. 34.7335, 135.5001')):fld('Coordinates (latitude, longitude) — for a place that can’t be found',inp('f_ll',fmtLL(d.coord),'text','e.g. 36.2381, 137.9720')) )+'</div>'+(tr?viaHtml(d):'')+'<div class="hint" style="margin-bottom:6px">In Google Maps, right-click the spot and click the two numbers at the top of the menu to copy them, then paste here.</div>'+
@@ -2091,7 +2091,7 @@ function openNote(id){
   const dlg=$('#dlg');
   dlg.innerHTML='<div class="dbody"><div class="dh">'+ico('note')+'<span>'+(ed.isNew?'New note':'Edit note')+'</span><button class="x" data-act="dclose" aria-label="Close">&times;</button></div><div class="db">'+
     fld('Title',inp('n_title',draft.title,'text','e.g. Loading an IC card onto an iPhone'))+
-    fld('Content','<textarea id="n_body" style="min-height:240px" placeholder="Write the steps, details or reminders here">'+esc(draft.body)+'</textarea>')+
+    fld('Content','<textarea id="n_body" style="min-height:720px" placeholder="Write the steps, details or reminders here">'+esc(draft.body)+'</textarea>')+
     '<div class="blk" data-zone="file"><h4>'+ico('clip')+'Screenshots &amp; files</h4><div class="drop" tabindex="0" data-zone="file" id="dropFile">Click here and paste a screenshot (Ctrl+V), drop images or files, or <button type="button" class="linkbtn" data-act="pickfile" data-zone="file">choose files</button></div><div class="atts" id="attsFile"></div></div>'+
     '</div><div class="df">'+(ed.isNew?'':'<button class="btn danger l" data-act="notedel">Delete</button>')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="notesave">Save</button></div></div><input type="file" id="fileIn" multiple hidden>';
   dlg.onclose=cleanupEd;if(!dlg.open)dlg.showModal();renderAtts();
@@ -2543,7 +2543,7 @@ function openActionDialog(id){
     '<label class="f"><span>Do by (optional)</span><input id="x_due" type="date" value="'+esc(a.due||'')+'"></label>'+
     '<label class="f"><span>Relates to day (optional)</span><select id="x_day"><option value="">Not tied to a day</option>'+days.map((d,i)=>'<option value="'+esc(d)+'"'+(d===a.day?' selected':'')+'>Day '+(i+1)+' · '+esc(fmtShort(d))+'</option>').join('')+'</select></label>'+
     '<label class="f"><span>Priority</span><select id="x_pri">'+Object.keys(ACT_PRI).map(k=>'<option value="'+k+'"'+((a.pri||'normal')===k?' selected':'')+'>'+ACT_PRI[k][0]+'</option>').join('')+'</select></label>'+
-    '<label class="f"><span>Notes (optional)</span><textarea id="x_notes" rows="3">'+esc(a.notes||'')+'</textarea></label>'+
+    '<label class="f"><span>Notes (optional)</span><textarea id="x_notes" rows="3" style="min-height:270px">'+esc(a.notes||'')+'</textarea></label>'+
     '</div><div class="df">'+(id?'<button class="btn" data-act="actdel" data-id="'+esc(id)+'" style="margin-right:auto">Delete</button>':'')+'<button class="btn" data-act="dclose">Cancel</button><button class="btn primary" data-act="actsave" data-id="'+esc(id||'')+'">Save</button></div></div>';
   dlg.onclose=null;if(!dlg.open)dlg.showModal();
   setTimeout(()=>{const e=$('#x_text');if(e)e.focus();},50);

@@ -6,7 +6,7 @@ Single-file browser app (`index.html`), hosted on GitHub Pages at https://mkirst
 - Edit `index.html` directly and push to `main` (Pages updates in 1-2 minutes). Never delete `index.html`.
 - Before pushing: syntax-check the script block, then test headless with Playwright. Stub the network (Leaflet, geocoding, routing, jsPDF, pdf.js, OneDrive) and say plainly what could not be tested live.
 - After every change, send Marc the updated `index.html` as `travel-manager-vX.Y.html` (and `CLAUDE.md` if it changed) so he can save them to his NAS as a backup.
-- Versioning: the footer VERSION string reads `YYYY-MM-DD · travel manager vX.Y`. Bump it on every change (Y for each change, X for a big new area), and name Marc's backup copy `travel-manager-vX.Y.html` (the repo file itself stays `index.html`). Current: v3.6.
+- Versioning: the footer VERSION string reads `YYYY-MM-DD · travel manager vX.Y`. Bump it on every change (Y for each change, X for a big new area), and name Marc's backup copy `travel-manager-vX.Y.html` (the repo file itself stays `index.html`). Current: v3.7.
 - Ask whether to update the project's rebuild guide (`claude/travel-manager-rebuild-guide.md` in the Software Solutions project): add a change-history line and update the relevant section. Re-read the guide before writing it back.
 
 ## Things not to break
