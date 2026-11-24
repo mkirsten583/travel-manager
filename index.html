@@ -254,7 +254,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.8';
+const VERSION = '2026-11-22 · travel manager v3.9';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -1489,7 +1489,7 @@ function renderDay(){
   h+='<div class="calfilt nop"><span class="hint">Show:</span><button class="fchip kall'+(sel.length?'':' on')+'" data-act="dayall" aria-pressed="'+!sel.length+'">All <span class="n">'+rows.length+'</span></button>'+
     TYPES.map(ty=>'<button class="fchip k-'+ty.id+(sel.includes(ty.id)?' on':'')+'" data-act="daytype" data-type="'+ty.id+'" aria-pressed="'+sel.includes(ty.id)+'">'+ico(ty.icon)+ty.label+' <span class="n">'+(cnt[ty.id]||0)+'</span></button>').join('')+'</div>';
   const shown=sel.length?rows.filter(r=>sel.includes(r.it.type)):rows;
-  const gapOpts='<label class="chk"><input type="checkbox" id="tl_gaps"'+(tlGap.on?' checked':'')+'> Highlight gaps of</label><select id="tl_min" class="btn" style="padding:3px 6px">'+[[60,'1 hour'],[90,'1.5 hours'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours']].map(o=>'<option value="'+o[0]+'"'+(o[0]===tlGap.min?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><span class="hint">or more</span>';
+  const gapOpts='<label class="chk"><input type="checkbox" id="tl_gaps"'+(tlGap.on?' checked':'')+'> Highlight gaps of</label><select id="tl_min" class="btn" style="padding:3px 6px">'+[[15,'15 minutes'],[30,'30 minutes'],[45,'45 minutes'],[60,'1 hour'],[90,'1.5 hours'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours']].map(o=>'<option value="'+o[0]+'"'+(o[0]===tlGap.min?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><span class="hint">or more</span>';
   h=h.replace(/<\/div>$/,'<span class="sp"></span>'+gapOpts+'</div>');
   let gapAt=[];
   if(tlGap.on){
@@ -2141,7 +2141,7 @@ function tlBars(items,type){
   return {bars,none,rows:Math.max(1,ends.length)};
 }
 let tlGap={on:false,min:120};
-try{const g=JSON.parse(localStorage.getItem('travel-mgr-tlgaps-v1')||'null');if(g){tlGap.on=!!g.on;tlGap.min=[60,90,120,180,240].includes(+g.min)?+g.min:120;}}catch(e){}
+try{const g=JSON.parse(localStorage.getItem('travel-mgr-tlgaps-v1')||'null');if(g){tlGap.on=!!g.on;tlGap.min=[15,30,45,60,90,120,180,240].includes(+g.min)?+g.min:120;}}catch(e){}
 const durTxt=m=>(m>=60?Math.floor(m/60)+'h':'')+(m%60?(m>=60?' ':'')+m%60+'m':'');
 /* gaps = stretches between the first and last timed item of a day (5am-midnight) with nothing on in any lane, at least tlGap.min long; a day with no timed items at all is flagged too */
 function tlGaps(dayItems){
@@ -2158,7 +2158,7 @@ function renderTimeline(){
   const hrs=[];for(let m=TL_START;m<=TL_END;m+=60)hrs.push(m);
   const head='<div class="tl-row tl-hd"><div class="tl-lab"></div><div class="tl-track">'+hrs.map(m=>'<span class="tl-h" style="left:'+((m-TL_START)/TL_SPAN*100)+'%">'+(m===1440?'12am':m===720?'12pm':m>720?(m/60-12)+'pm':(m/60)+'am')+'</span>').join('')+'</div></div>';
   const grid=hrs.map(m=>'<i class="tl-g'+(m%360===0?' b':'')+'" style="left:'+((m-TL_START)/TL_SPAN*100)+'%"></i>').join('');
-  const legend='<div class="calfilt"><label class="chk"><input type="checkbox" id="tl_gaps"'+(tlGap.on?' checked':'')+'> Highlight gaps of</label><select id="tl_min" class="btn" style="padding:3px 6px">'+[[60,'1 hour'],[90,'1.5 hours'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours']].map(o=>'<option value="'+o[0]+'"'+(o[0]===tlGap.min?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><span class="hint">or more with nothing on</span>'+TL_LANES.map(l=>'<span class="tl-key"><i style="background:var('+l[2]+')"></i>'+l[1]+'</span>').join('')+'<span class="hint">Click a bar to edit it, a day to open it. Times before 5am show at the right edge. Hover a bar to see what it is. Hollow squares at the left of a lane are items with no time.</span></div>';
+  const legend='<div class="calfilt"><label class="chk"><input type="checkbox" id="tl_gaps"'+(tlGap.on?' checked':'')+'> Highlight gaps of</label><select id="tl_min" class="btn" style="padding:3px 6px">'+[[15,'15 minutes'],[30,'30 minutes'],[45,'45 minutes'],[60,'1 hour'],[90,'1.5 hours'],[120,'2 hours'],[180,'3 hours'],[240,'4 hours']].map(o=>'<option value="'+o[0]+'"'+(o[0]===tlGap.min?' selected':'')+'>'+o[1]+'</option>').join('')+'</select><span class="hint">or more with nothing on</span>'+TL_LANES.map(l=>'<span class="tl-key"><i style="background:var('+l[2]+')"></i>'+l[1]+'</span>').join('')+'<span class="hint">Click a bar to edit it, a day to open it. Times before 5am show at the right edge. Hover a bar to see what it is. Hollow squares at the left of a lane are items with no time.</span></div>';
   const body=days.map((d,ix)=>{
     const dayItems=items.filter(i=>i.type!=='stay'&&i.date===d);
     const stay=items.find(i=>i.type==='stay'&&i.date&&i.date<=d&&d<(i.endDate||i.date))||items.find(i=>i.type==='stay'&&i.endDate===d);
