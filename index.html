@@ -254,7 +254,7 @@ dialog .toast{top:14px;bottom:auto}
 const GRAPH_CLIENT_ID_DEFAULT = 'a54276ff-ae02-48d7-83c3-331d7dd2c034';   // Azure app registration for THIS page (or paste it in Data & sync)
 const DATA_FOLDER = 'marc.kirsten/Browser Tools/Travel Manager';        // OneDrive folder (keep the marc.kirsten/ prefix)
 const DATA_FILE = DATA_FOLDER + '/travel-data.json';
-const VERSION = '2026-11-22 · travel manager v3.9';
+const VERSION = '2026-11-22 · travel manager v3.10';
 /* ============================================================ */
 
 const LS_KEY='travel-mgr-data-v1', LS_DIRTY='travel-mgr-dirty-v1', LS_SEL='travel-mgr-sel-v1', LS_PREV='travel-mgr-prev-v1', LS_CID='travel-mgr-clientid-v1', LS_VIEW='travel-mgr-view-v1';
@@ -1493,13 +1493,13 @@ function renderDay(){
   h=h.replace(/<\/div>$/,'<span class="sp"></span>'+gapOpts+'</div>');
   let gapAt=[];
   if(tlGap.on){
-    const G=tlGaps(rows.map(r=>r.it).filter(i=>i.type!=='stay'));
+    const G=tlGaps(rows.map(r=>r.it).filter(i=>i.type!=='stay').concat(stayGapItems(selDate,rows.map(r=>r.it))));
     if(G.empty&&shown.length)h+='<div class="daygap">No timed items on this day</div>';
     gapAt=G.gaps.slice();
   }
   const cards=[];
   shown.forEach(r=>{
-    const s=r.it.type==='stay'?null:minOf(r.it.time);
+    const s=r.it.type==='stay'?(stayGapItems(selDate,[r.it]).length?minOf(r.it.date===selDate&&r.it.endDate!==selDate?r.it.time:r.it.endTime):null):minOf(r.it.time);
     while(gapAt.length&&s!=null&&s>=gapAt[0][1]){const g=gapAt.shift();cards.push('<div class="daygap">Gap '+hhmm(g[0])+' – '+hhmm(g[1])+' · '+durTxt(g[1]-g[0])+' with nothing on</div>');}
     cards.push(cardHtml(r.it,selDate));
   });
@@ -2120,7 +2120,14 @@ async function deleteNote(){
 /* ============ TIMELINE VIEW: one row per day, hours across, a lane per event type ============ */
 const TL_START=300,TL_END=1440,TL_SPAN=TL_END-TL_START;
 const TL_LANES=[['activity','Activities','--c-act'],['food','Meals','--c-food'],['transport','Travel','--c-trans'],['other','Other','--c-other']];
-const TL_DUR={activity:60,food:60,transport:30,other:30};
+const TL_DUR={activity:60,food:60,transport:30,other:30,stayev:15};
+/* a hotel check-in or check-out with a time set counts as a 15 minute event when looking for gaps */
+function stayGapItems(date,items){
+  const out=[];(items||[]).forEach(it=>{if(it.type!=='stay'||!it.date)return;
+    if(date===it.date&&it.endDate!==date&&it.time)out.push({type:'stayev',time:it.time});
+    else if(date===(it.endDate||'')&&it.endTime)out.push({type:'stayev',time:it.endTime});});
+  return out;
+}
 const hhmm=m=>{m=((m%1440)+1440)%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');};
 function tlBars(items,type){
   const bars=[],none=[];
@@ -2162,7 +2169,7 @@ function renderTimeline(){
   const body=days.map((d,ix)=>{
     const dayItems=items.filter(i=>i.type!=='stay'&&i.date===d);
     const stay=items.find(i=>i.type==='stay'&&i.date&&i.date<=d&&d<(i.endDate||i.date))||items.find(i=>i.type==='stay'&&i.endDate===d);
-    const G=tlGap.on?tlGaps(dayItems):{gaps:[]},gapTot=G.gaps.reduce((a,g)=>a+g[1]-g[0],0);
+    const G=tlGap.on?tlGaps(dayItems.concat(stayGapItems(d,items))):{gaps:[]},gapTot=G.gaps.reduce((a,g)=>a+g[1]-g[0],0);
     const gapHtml=G.gaps.map(g=>'<div class="tl-gap" style="left:'+((g[0]-TL_START)/TL_SPAN*100)+'%;width:'+((g[1]-g[0])/TL_SPAN*100)+'%" title="'+esc('Gap '+hhmm(g[0])+'-'+hhmm(g[1])+' ('+durTxt(g[1]-g[0])+')')+'"><span>'+durTxt(g[1]-g[0])+'</span></div>').join('');
     const lanes=TL_LANES.map(([ty,lab,cv])=>{
       const r=tlBars(dayItems,ty);
